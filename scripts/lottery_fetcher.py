@@ -35,32 +35,61 @@ def main():
     # TODO: Replace the dummy data below with your actual scraping/API logic
     # =========================================================================
     
-    # Example 1: Inserting into "Morning (1 PM)" Tab
+    today_date = datetime.now()
+    date_str_sheets = today_date.strftime("%Y-%m-%d")
+    date_str_url = today_date.strftime("%d-%m-%Y")
+    day_str = today_date.strftime("%A").upper()
+
+    # 1. Morning (1 PM)
+    morning_url = f"https://lottery.sambad.com/images/mobile/lottery-sambad-1pm-{date_str_url}.avif"
     morning_data = {
-        "Date": datetime.now().strftime("%Y-%m-%d"),
+        "Date": date_str_sheets,
         "Time": "1 PM",
-        "Day": "SUNDAY",
+        "Day": day_str,
         "Draw No": "123",
         "Lottery Name": "DEAR MORNING",
         "1st Prize": "89341",
         "2nd Prize": "12345, 67890",
         "3rd Prize": "1111, 2222, 3333",
         "4th Prize": "4444, 5555, 6666",
-        "5th Prize": "7777, 8888, 9999"
+        "5th Prize": "7777, 8888, 9999",
+        "source_url": morning_url
     }
     send_to_gas("Morning (1 PM)", morning_data)
 
-    # Example 2: Inserting into a Prediction Tab with totally different columns
-    prediction_data = {
-        "Date": datetime.now().strftime("%Y-%m-%d"),
-        "Time": "8 PM",
-        "Day": "SUNDAY",
-        "Middle Matrix": "00, 01, 02, 03, 04",
-        "5 Digit Predicti": "34519, 14519, 94019",
-        "4 Digit Predicti": "50314, 70026",
-        "SUPER VIP PREDICTION": "92902, 31202, 51248"
+    # 2. Day (6 PM)
+    day_url = f"https://lottery.sambad.com/images/mobile/lottery-sambad-6pm-{date_str_url}.avif"
+    day_data = {
+        "Date": date_str_sheets,
+        "Time": "6 PM",
+        "Day": day_str,
+        "Draw No": "124",
+        "Lottery Name": "DEAR DAY",
+        "1st Prize": "45678",
+        "2nd Prize": "54321, 09876",
+        "3rd Prize": "4444, 5555, 6666",
+        "4th Prize": "7777, 8888, 9999",
+        "5th Prize": "1111, 2222, 3333",
+        "source_url": day_url
     }
-    send_to_gas("Predictions Evening (8 PM)", prediction_data)
+    send_to_gas("Day (6 PM)", day_data)
+
+    # 3. Evening (8 PM)
+    evening_url = f"https://lottery.sambad.com/images/mobile/lottery-sambad-8pm-{date_str_url}.avif"
+    evening_data = {
+        "Date": date_str_sheets,
+        "Time": "8 PM",
+        "Day": day_str,
+        "Draw No": "125",
+        "Lottery Name": "DEAR EVENING",
+        "1st Prize": "99999",
+        "2nd Prize": "11111, 22222",
+        "3rd Prize": "3333, 4444, 5555",
+        "4th Prize": "6666, 7777, 8888",
+        "5th Prize": "9999, 0000, 1111",
+        "source_url": evening_url
+    }
+    send_to_gas("Evening (8 PM)", evening_data)
 
 if __name__ == "__main__":
     main()
