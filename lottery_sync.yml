@@ -1,0 +1,30 @@
+name: Lottery Data Sync
+
+on:
+  schedule:
+    # Run every day at specific times (UTC time used in cron)
+    # Example: 11:00 AM IST is 5:30 AM UTC
+    - cron: '30 5 * * *'   # 11:00 AM IST
+    - cron: '30 10 * * *'  # 4:00 PM IST
+    - cron: '30 14 * * *'  # 8:00 PM IST
+  workflow_dispatch:        # Allows you to run this workflow manually from Actions tab
+
+jobs:
+  sync-lottery-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          
+      - name: Install dependencies
+        run: pip install requests
+        
+      - name: Run lottery fetcher
+        env:
+          # This pulls the Webhook URL from your GitHub Repository Secrets
+          GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
+        run: python scripts/lottery_fetcher.py
