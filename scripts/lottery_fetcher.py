@@ -8,6 +8,7 @@ from PIL import Image
 import fitz  # PyMuPDF
 import pytesseract
 import re
+from datetime import datetime, timedelta, timezone
 
 # URL of your deployed Google Apps Script Web App
 GAS_WEBHOOK_URL = os.environ.get("GAS_WEBHOOK_URL")
@@ -88,7 +89,8 @@ def main():
         print("Error: GAS_WEBHOOK_URL environment variable is not set!")
         return
     
-    today_date = datetime.now()
+    ist = timezone(timedelta(hours=5, minutes=30))
+    today_date = datetime.now(ist)
     
     # Save into Google Sheets as the REAL current date (e.g. 2026)
     date_str_sheets = today_date.strftime("%Y-%m-%d")
