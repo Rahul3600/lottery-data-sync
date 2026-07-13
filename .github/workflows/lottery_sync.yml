@@ -20,8 +20,11 @@ jobs:
         with:
           python-version: '3.12'
           
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+        
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests pytesseract pillow pillow-avif-plugin
         
       - name: Run lottery fetcher
         env:
