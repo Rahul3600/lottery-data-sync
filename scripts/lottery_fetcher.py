@@ -5,7 +5,7 @@ from datetime import datetime
 
 import io
 from PIL import Image
-import pillow_avif
+import fitz  # PyMuPDF
 import pytesseract
 import re
 
@@ -34,17 +34,26 @@ def send_to_gas(tab_name, data_dict):
 
 def process_lottery_image(url):
     """
-    Downloads the AVIF image, runs OCR, and extracts the prizes using regex heuristics.
-    Returns a dict with prizes or None if the image is not available yet.
+    Downloads the PDF, converts the first page to an image using PyMuPDF, runs OCR, 
+    and extracts the prizes using regex heuristics.
+    Returns a dict with prizes or None if the PDF is not available yet.
     """
     try:
         response = requests.get(url, stream=True, timeout=10)
         if response.status_code != 200:
-            print(f"Image not available yet: {url}")
+            print(f"File not available yet: {url}")
             return None
             
         print(f"Running OCR on {url}...")
-        img = Image.open(response.raw)
+        
+        # Load the PDF from bytes
+        doc = fitz.open(stream=response.content, filetype="pdf")
+        page = doc.load_page(0)
+        pix = page.get_pixmap()
+        
+        # Convert to PIL Image for pytesseract
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        
         text = pytesseract.image_to_string(img)
         
         # Extract 5-digit and 4-digit numbers using Regex
@@ -83,13 +92,8 @@ def main():
     
     # Save into Google Sheets as the REAL current date (e.g. 2026)
     date_str_sheets = today_date.strftime("%Y-%m-%d")
+    date_str_url = today_date.strftime("%d-%m-%Y")
     day_str = today_date.strftime("%A").upper()
-
-    # Hack: Since it's 2026, images on the official server will 404. We fetch the image from 2024 instead to run OCR.
-    url_date = today_date
-    if url_date.year == 2026:
-        url_date = url_date.replace(year=2024)
-    date_str_url = url_date.strftime("%d-%m-%Y")
 
     draws = [
         {"time": "1:00 PM", "name": "DEAR MORNING", "url_part": "1pm", "hour": 13},
@@ -104,7 +108,7 @@ def main():
             print(f"Skipping {draw['time']}: It is currently {current_hour}:00, which is before the {draw['hour']}:00 draw time.")
             continue
 
-        url = f"https://lottery.sambad.com/images/mobile/lottery-sambad-{draw['url_part']}-{date_str_url}.avif"
+        url = f"https://lottery.sambad.com/pdf/lottery-sambad-{draw['url_part']}-{date_str_url}.pdf"
         
         ocr_prizes = process_lottery_image(url)
         if ocr_prizes:
