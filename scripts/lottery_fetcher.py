@@ -100,7 +100,7 @@ def main():
     draws = [
         {"time": "1:00 PM", "name": "DEAR MORNING", "url_part": "1pm", "hour": 13},
         {"time": "6:00 PM", "name": "DEAR DAY", "url_part": "6pm", "hour": 18},
-        {"time": "8:00 PM", "name": "DEAR EVENING", "url_part": "8pm", "hour": 20}
+        {"time": "8:00 PM", "name": "DEAR NIGHT", "url_part": "8pm", "hour": 20}
     ]
 
     current_hour = today_date.hour
