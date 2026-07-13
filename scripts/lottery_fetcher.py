@@ -72,28 +72,7 @@ def process_lottery_image(url):
         print(f"OCR Exception for {url}: {e}")
         return None
 
-def generate_dummy_data(draw, date_str_sheets, day_str, url):
-    """Generates dummy fallback data if OCR fails or image is not available yet (e.g. 2026 test dates)"""
-    dummy_prizes = {
-        "1pm": {"1st": "89341", "2nd": "12345, 67890", "3rd": "1111, 2222, 3333", "4th": "4444, 5555, 6666", "5th": "7777, 8888, 9999"},
-        "6pm": {"1st": "45678", "2nd": "54321, 09876", "3rd": "4444, 5555, 6666", "4th": "7777, 8888, 9999", "5th": "1111, 2222, 3333"},
-        "8pm": {"1st": "99999", "2nd": "11111, 22222", "3rd": "3333, 4444, 5555", "4th": "6666, 7777, 8888", "5th": "9999, 0000, 1111"}
-    }
-    p = dummy_prizes.get(draw["url_part"], dummy_prizes["1pm"])
-    
-    return {
-        "Date": date_str_sheets,
-        "Time": f"'{draw['time']}", 
-        "Day": day_str,
-        "Draw No": "Live",
-        "Lottery Name": draw["name"],
-        "source_url": url,
-        "1st Prize": p["1st"],
-        "2nd Prize": p["2nd"],
-        "3rd Prize": p["3rd"],
-        "4th Prize": p["4th"],
-        "5th Prize": p["5th"]
-    }
+
 
 def main():
     if not GAS_WEBHOOK_URL:
@@ -102,12 +81,7 @@ def main():
     
     today_date = datetime.now()
     date_str_sheets = today_date.strftime("%Y-%m-%d")
-    
-    # Temporary test logic: if year is 2026, use 2024 for the image fetch URL so we hit REAL data!
-    url_date = today_date
-    if url_date.year == 2026:
-        url_date = url_date.replace(year=2024)
-    date_str_url = url_date.strftime("%d-%m-%Y")
+    date_str_url = today_date.strftime("%d-%m-%Y")
     day_str = today_date.strftime("%A").upper()
 
     draws = [
@@ -135,9 +109,7 @@ def main():
             data.update(ocr_prizes)
             send_to_gas(f"Results {draw['time']}", data)
         else:
-            print(f"Fallback: Sending dummy data for {draw['time']} because OCR failed or image missing.")
-            fallback_data = generate_dummy_data(draw, date_str_sheets, day_str, url)
-            send_to_gas(f"Results {draw['time']}", fallback_data)
+            print(f"Skipping {draw['time']}: Image not uploaded yet or OCR failed.")
 
 if __name__ == "__main__":
     main()
