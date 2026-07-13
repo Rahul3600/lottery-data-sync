@@ -80,17 +80,30 @@ def main():
         return
     
     today_date = datetime.now()
+    
+    # Save into Google Sheets as the REAL current date (e.g. 2026)
     date_str_sheets = today_date.strftime("%Y-%m-%d")
-    date_str_url = today_date.strftime("%d-%m-%Y")
     day_str = today_date.strftime("%A").upper()
 
+    # Hack: Since it's 2026, images on the official server will 404. We fetch the image from 2024 instead to run OCR.
+    url_date = today_date
+    if url_date.year == 2026:
+        url_date = url_date.replace(year=2024)
+    date_str_url = url_date.strftime("%d-%m-%Y")
+
     draws = [
-        {"time": "1:00 PM", "name": "DEAR MORNING", "url_part": "1pm"},
-        {"time": "6:00 PM", "name": "DEAR DAY", "url_part": "6pm"},
-        {"time": "8:00 PM", "name": "DEAR EVENING", "url_part": "8pm"}
+        {"time": "1:00 PM", "name": "DEAR MORNING", "url_part": "1pm", "hour": 13},
+        {"time": "6:00 PM", "name": "DEAR DAY", "url_part": "6pm", "hour": 18},
+        {"time": "8:00 PM", "name": "DEAR EVENING", "url_part": "8pm", "hour": 20}
     ]
 
+    current_hour = today_date.hour
+
     for draw in draws:
+        if current_hour < draw["hour"]:
+            print(f"Skipping {draw['time']}: It is currently {current_hour}:00, which is before the {draw['hour']}:00 draw time.")
+            continue
+
         url = f"https://lottery.sambad.com/images/mobile/lottery-sambad-{draw['url_part']}-{date_str_url}.avif"
         
         ocr_prizes = process_lottery_image(url)
