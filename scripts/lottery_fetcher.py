@@ -102,7 +102,12 @@ def main():
     
     today_date = datetime.now()
     date_str_sheets = today_date.strftime("%Y-%m-%d")
-    date_str_url = today_date.strftime("%d-%m-%Y")
+    
+    # Temporary test logic: if year is 2026, use 2024 for the image fetch URL so we hit REAL data!
+    url_date = today_date
+    if url_date.year == 2026:
+        url_date = url_date.replace(year=2024)
+    date_str_url = url_date.strftime("%d-%m-%Y")
     day_str = today_date.strftime("%A").upper()
 
     draws = [
