@@ -40,11 +40,11 @@ def main():
     date_str_url = today_date.strftime("%d-%m-%Y")
     day_str = today_date.strftime("%A").upper()
 
-    # 1. Morning (1 PM)
+    # 1. Morning (1:00 PM)
     morning_url = f"https://lottery.sambad.com/images/mobile/lottery-sambad-1pm-{date_str_url}.avif"
     morning_data = {
         "Date": date_str_sheets,
-        "Time": "1 PM",
+        "Time": "1:00 PM",
         "Day": day_str,
         "Draw No": "123",
         "Lottery Name": "DEAR MORNING",
@@ -55,13 +55,13 @@ def main():
         "5th Prize": "7777, 8888, 9999",
         "source_url": morning_url
     }
-    send_to_gas("Morning (1 PM)", morning_data)
+    send_to_gas("Morning (1:00 PM)", morning_data)
 
-    # 2. Day (6 PM)
+    # 2. Day (6:00 PM)
     day_url = f"https://lottery.sambad.com/images/mobile/lottery-sambad-6pm-{date_str_url}.avif"
     day_data = {
         "Date": date_str_sheets,
-        "Time": "6 PM",
+        "Time": "6:00 PM",
         "Day": day_str,
         "Draw No": "124",
         "Lottery Name": "DEAR DAY",
@@ -72,13 +72,13 @@ def main():
         "5th Prize": "1111, 2222, 3333",
         "source_url": day_url
     }
-    send_to_gas("Day (6 PM)", day_data)
+    send_to_gas("Day (6:00 PM)", day_data)
 
-    # 3. Evening (8 PM)
+    # 3. Evening (8:00 PM)
     evening_url = f"https://lottery.sambad.com/images/mobile/lottery-sambad-8pm-{date_str_url}.avif"
     evening_data = {
         "Date": date_str_sheets,
-        "Time": "8 PM",
+        "Time": "8:00 PM",
         "Day": day_str,
         "Draw No": "125",
         "Lottery Name": "DEAR EVENING",
@@ -89,7 +89,7 @@ def main():
         "5th Prize": "9999, 0000, 1111",
         "source_url": evening_url
     }
-    send_to_gas("Evening (8 PM)", evening_data)
+    send_to_gas("Evening (8:00 PM)", evening_data)
 
 if __name__ == "__main__":
     main()
