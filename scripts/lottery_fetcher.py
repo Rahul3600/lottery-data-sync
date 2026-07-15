@@ -55,7 +55,9 @@ def process_lottery_image(url):
         # Convert to PIL Image for pytesseract
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
         
-        text = pytesseract.image_to_string(img)
+        # Use PSM 6 (Assume a single uniform block of text) which drastically improves 
+        # Tesseract's ability to extract dense grids/tables of 4-digit numbers.
+        text = pytesseract.image_to_string(img, config='--psm 6')
         
         # Extract 5-digit and 4-digit numbers using Regex
         five_digits = re.findall(r'\b\d{5}\b', text)
@@ -65,12 +67,23 @@ def process_lottery_image(url):
             print("OCR extracted text but found no 5-digit or 4-digit patterns.")
             return None
             
+        # 1st and 2nd prizes (5 digits) are near the top.
         first_prize = five_digits[0] if len(five_digits) > 0 else "N/A"
         second_prize = ", ".join(five_digits[1:11]) if len(five_digits) > 1 else "N/A"
-        third_prize = ", ".join(four_digits[:10]) if len(four_digits) > 0 else "N/A"
-        fourth_prize = ", ".join(four_digits[10:20]) if len(four_digits) > 10 else "N/A"
-        fifth_prize = ", ".join(four_digits[20:140]) if len(four_digits) > 20 else "N/A"
         
+        # 3rd, 4th, 5th prizes (4 digits) are at the bottom. 
+        # The PDF contains noise at the top (e.g. "2026" in date, "9000" in prize amount)
+        # Taking from the back ensures we skip the top-page noise and perfectly grab the grids.
+        if len(four_digits) >= 120:
+            fifth_prize = ", ".join(four_digits[-120:])
+            fourth_prize = ", ".join(four_digits[-130:-120]) if len(four_digits) >= 130 else "N/A"
+            third_prize = ", ".join(four_digits[-140:-130]) if len(four_digits) >= 140 else "N/A"
+        else:
+            # Fallback if OCR missed a massive chunk of numbers
+            third_prize = ", ".join(four_digits[:10]) if len(four_digits) > 0 else "N/A"
+            fourth_prize = ", ".join(four_digits[10:20]) if len(four_digits) > 10 else "N/A"
+            fifth_prize = ", ".join(four_digits[20:]) if len(four_digits) > 20 else "N/A"
+            
         return {
             "1st Prize": first_prize,
             "2nd Prize": second_prize,
