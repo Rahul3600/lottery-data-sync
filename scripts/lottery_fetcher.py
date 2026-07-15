@@ -35,64 +35,117 @@ def send_to_gas(tab_name, data_dict):
 
 def process_lottery_image(url):
     """
-    Downloads the PDF, converts the first page to an image using PyMuPDF, runs OCR, 
-    and extracts the prizes using regex heuristics.
+    Downloads the PDF and extracts prize data using PyMuPDF's native text extraction.
+    This is FAR more accurate than OCR for structured PDFs like lottery results.
+    
+    The Lottery Sambad PDF structure (verified by analysis) is:
+    - Lines 0-99:    5th Prize   (100 x 4-digit numbers, one per line)
+    - Lines 100-101: 2nd Prize   (5 x 5-digit numbers per line = 10 total)
+    - Lines 102-103: 3rd Prize   (5 x 4-digit numbers per line = 10 total)
+    - [TDS notice / seller info lines in between]
+    - Lines 110-111: 4th Prize   (5 x 4-digit numbers per line = 10 total)
+    - Line ~112:     1st Prize   (format: "XXH NNNNN" e.g., "85H 56406")
+    
     Returns a dict with prizes or None if the PDF is not available yet.
     """
     try:
-        response = requests.get(url, stream=True, timeout=10)
+        response = requests.get(url, stream=True, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
         if response.status_code != 200:
-            print(f"File not available yet: {url}")
+            print(f"File not available yet (HTTP {response.status_code}): {url}")
             return None
             
-        print(f"Running OCR on {url}...")
+        print(f"Extracting prizes from PDF: {url}")
         
-        # Load the PDF from bytes
         doc = fitz.open(stream=response.content, filetype="pdf")
         page = doc.load_page(0)
-        pix = page.get_pixmap()
+        raw_text = page.get_text()
         
-        # Convert to PIL Image for pytesseract
-        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        # Split into non-empty lines
+        lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
         
-        # Use PSM 6 (Assume a single uniform block of text) which drastically improves 
-        # Tesseract's ability to extract dense grids/tables of 4-digit numbers.
-        text = pytesseract.image_to_string(img, config='--psm 6')
+        # --- Extract 1st Prize (e.g., "85H 56406") ---
+        first_prize = "N/A"
+        first_prize_series = ""
+        # Pattern: letter series (like 85H, 91H, 95H) followed by 5-digit number
+        fp_pattern = re.compile(r'\b([A-Z0-9]+H)\s+(\d{5})\b')
+        for line in lines:
+            m = fp_pattern.search(line)
+            if m and "Prize" not in line and "Amount" not in line:
+                first_prize_series = m.group(1)
+                first_prize = f"{m.group(1)} {m.group(2)}"
+                break
+        # Fallback: just a standalone 5-digit number near the bottom
+        if first_prize == "N/A":
+            for line in reversed(lines[-20:]):
+                m = re.search(r'^\d{5}$', line)
+                if m:
+                    first_prize = line
+                    break
         
-        # Extract 5-digit and 4-digit numbers using Regex
-        five_digits = re.findall(r'\b\d{5}\b', text)
-        four_digits = re.findall(r'\b\d{4}\b', text)
+        # --- Extract 2nd Prize (5-digit numbers, NOT including the 1st prize number) ---
+        five_digit_blocks = []
+        for line in lines:
+            nums = re.findall(r'\b\d{5}\b', line)
+            if nums:
+                # Exclude the line that contains the first prize series (e.g. "85H 56406")
+                if not fp_pattern.search(line):
+                    five_digit_blocks.extend(nums)
+        second_prize = ", ".join(five_digit_blocks[:10]) if five_digit_blocks else "N/A"
         
-        if not five_digits and not four_digits:
-            print("OCR extracted text but found no 5-digit or 4-digit patterns.")
-            return None
+        # --- Extract 4-digit number blocks ---
+        # PDF structure: lines 0-99 are the 5th Prize (one 4-digit number per line)
+        # After 5-digit blocks appear: 3rd prize rows, then 4th prize rows
+        four_digit_single_lines = []  # Lines with exactly ONE 4-digit number (5th prize rows)
+        four_digit_group_lines = []   # Lines with MULTIPLE 4-digit numbers (3rd/4th prize rows)
+        
+        for line in lines:
+            # Skip lines with 5-digit numbers (those are 2nd/1st prize)
+            if re.search(r'\b\d{5}\b', line):
+                continue
+            # Skip noisy text lines (TDS notice, dates with slashes, etc.)
+            if '/' in line or any(word in line.upper() for word in ['TDS', 'PRIZE', 'AMOUNT', 'DEDUCTED', 'SELLER', 'SOLD', 'SECTION', 'ACT', 'LOTTERY', 'WEEKLY', 'SPARK', 'DEAR', 'W.E.F']):
+                continue
             
-        # 1st and 2nd prizes (5 digits) are near the top.
-        first_prize = five_digits[0] if len(five_digits) > 0 else "N/A"
-        second_prize = ", ".join(five_digits[1:11]) if len(five_digits) > 1 else "N/A"
-        
-        # 3rd, 4th, 5th prizes (4 digits) are at the bottom. 
-        # The PDF contains noise at the top (e.g. "2026" in date, "9000" in prize amount)
-        # Taking from the back ensures we skip the top-page noise and perfectly grab the grids.
-        if len(four_digits) >= 120:
-            fifth_prize = ", ".join(four_digits[-120:])
-            fourth_prize = ", ".join(four_digits[-130:-120]) if len(four_digits) >= 130 else "N/A"
-            third_prize = ", ".join(four_digits[-140:-130]) if len(four_digits) >= 140 else "N/A"
-        else:
-            # Fallback if OCR missed a massive chunk of numbers
-            third_prize = ", ".join(four_digits[:10]) if len(four_digits) > 0 else "N/A"
-            fourth_prize = ", ".join(four_digits[10:20]) if len(four_digits) > 10 else "N/A"
-            fifth_prize = ", ".join(four_digits[20:]) if len(four_digits) > 20 else "N/A"
+            nums = re.findall(r'\b\d{4}\b', line)
+            if not nums:
+                continue
+                
+            # Exclude year-like numbers that are not prize numbers
+            nums = [n for n in nums if n not in ('2025', '2026', '2024', '2023')]
+            if not nums:
+                continue
             
+            if len(nums) == 1:
+                four_digit_single_lines.append(nums[0])
+            else:
+                four_digit_group_lines.extend(nums)
+        
+        # The 5th prize is the large block of single 4-digit numbers (100 numbers)
+        # Take first 100 from the single lines
+        fifth_prize_list = four_digit_single_lines[:100]
+        fifth_prize = ", ".join(fifth_prize_list) if fifth_prize_list else "N/A"
+        
+        # The group lines contain: 3rd prize (10 numbers) then 4th prize (10 numbers)
+        third_prize = ", ".join(four_digit_group_lines[:10]) if len(four_digit_group_lines) >= 10 else ", ".join(four_digit_group_lines)
+        fourth_prize = ", ".join(four_digit_group_lines[10:20]) if len(four_digit_group_lines) >= 20 else "N/A"
+        
+        print(f"  1st: {first_prize}")
+        print(f"  2nd: {len(five_digit_blocks)} numbers")
+        print(f"  3rd: {len(four_digit_group_lines[:10])} numbers")
+        print(f"  4th: {len(four_digit_group_lines[10:20])} numbers")
+        print(f"  5th: {len(fifth_prize_list)} numbers")
+        
         return {
             "1st Prize": first_prize,
             "2nd Prize": second_prize,
-            "3rd Prize": third_prize,
+            "3rd Prize": third_prize if third_prize else "N/A",
             "4th Prize": fourth_prize,
             "5th Prize": fifth_prize
         }
     except Exception as e:
-        print(f"OCR Exception for {url}: {e}")
+        print(f"Exception for {url}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
