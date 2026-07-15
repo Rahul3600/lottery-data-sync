@@ -194,7 +194,7 @@ def main():
             data.update(ocr_prizes)
             send_to_gas(f"Results {draw['time']}", data)
         else:
-            print(f"Skipping {draw['time']}: Image not uploaded yet or OCR failed.")
+            print(f"Skipping {draw['time']}: PDF not available yet or extraction failed.")
 
 if __name__ == "__main__":
     main()
