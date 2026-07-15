@@ -63,23 +63,30 @@ def process_lottery_image(url):
         # Split into non-empty lines
         lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
         
-        # --- Extract 1st Prize (e.g., "85H 56406") ---
+        # --- Extract 1st Prize ---
+        # Format is always: [digits][LETTER] [5-digit number]
+        # e.g. "85H 56406", "82E 01723", "88L 50029", "35K 64588", "80A 92718"
+        # The series letter is NEVER just H — it changes every draw!
         first_prize = "N/A"
-        first_prize_series = ""
-        # Pattern: letter series (like 85H, 91H, 95H) followed by 5-digit number
-        fp_pattern = re.compile(r'\b([A-Z0-9]+H)\s+(\d{5})\b')
+        first_prize_number = ""
+        # Pattern: digits followed by ONE uppercase letter, then a 5-digit number
+        fp_pattern = re.compile(r'\b(\d{1,3}[A-Z])\s+(\d{5})\b')
+        NOISE_LINES = {"Prize", "Amount", "TDS", "Lottery", "Sold", "DEAR", "SPARK", "WEEKLY", "Seller"}
         for line in lines:
+            if any(word in line for word in NOISE_LINES):
+                continue
             m = fp_pattern.search(line)
-            if m and "Prize" not in line and "Amount" not in line:
-                first_prize_series = m.group(1)
+            if m:
+                first_prize_number = m.group(2)
                 first_prize = f"{m.group(1)} {m.group(2)}"
                 break
-        # Fallback: just a standalone 5-digit number near the bottom
+        # Fallback: standalone 5-digit number near the bottom
         if first_prize == "N/A":
             for line in reversed(lines[-20:]):
                 m = re.search(r'^\d{5}$', line)
                 if m:
                     first_prize = line
+                    first_prize_number = line
                     break
         
         # --- Extract 2nd Prize (5-digit numbers, NOT including the 1st prize number) ---
