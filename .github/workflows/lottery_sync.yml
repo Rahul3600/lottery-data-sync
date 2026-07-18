@@ -30,4 +30,5 @@ jobs:
         env:
           # This pulls the Webhook URL from your GitHub Repository Secrets
           GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
+          EVENT_NAME: ${{ github.event_name }}
         run: python scripts/lottery_fetcher.py
