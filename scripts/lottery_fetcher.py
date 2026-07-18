@@ -176,12 +176,22 @@ def main():
         {"time": "8:00 PM", "name": "DEAR NIGHT", "url_part": "8pm", "hour": 20}
     ]
 
+    event_name = os.environ.get("EVENT_NAME", "workflow_dispatch")
+    
     current_hour = today_date.hour
 
     for draw in draws:
         if current_hour < draw["hour"]:
             print(f"Skipping {draw['time']}: It is currently {current_hour}:00, which is before the {draw['hour']}:00 draw time.")
             continue
+            
+        if event_name == "schedule":
+            valid_draws = [d for d in draws if d["hour"] <= current_hour]
+            most_recent_draw = max(valid_draws, key=lambda x: x["hour"]) if valid_draws else None
+            
+            if most_recent_draw and draw["time"] != most_recent_draw["time"]:
+                print(f"Skipping {draw['time']}: Scheduled run only processes the most recent draw ({most_recent_draw['time']}).")
+                continue
 
         url = f"https://lottery.sambad.com/pdf/lottery-sambad-{draw['url_part']}-{date_str_url}.pdf"
         
