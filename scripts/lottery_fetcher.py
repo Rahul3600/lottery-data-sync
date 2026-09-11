@@ -177,19 +177,30 @@ def main():
     ]
 
     current_hour = today_date.hour
+    event_name = os.environ.get("EVENT_NAME", "workflow_dispatch")
+    schedule_cron = os.environ.get("SCHEDULE_CRON", "")
 
-    # Always process ONLY the most recently completed draw (closest to current hour).
-    # This applies for both scheduled and manual (workflow_dispatch) runs, preventing
-    # duplicate rows when the workflow is retried or triggered manually.
-    valid_draws = [d for d in draws if d["hour"] <= current_hour]
-    if not valid_draws:
-        print(f"No draws have occurred yet at current hour {current_hour}:00 IST. Nothing to process.")
-        return
-    most_recent_draw = max(valid_draws, key=lambda x: x["hour"])
+    most_recent_draw = None
+
+    if event_name == "schedule" and schedule_cron:
+        if "7" in schedule_cron:
+            most_recent_draw = draws[0]  # 1 PM
+        elif "12" in schedule_cron:
+            most_recent_draw = draws[1]  # 6 PM
+        elif "14" in schedule_cron:
+            most_recent_draw = draws[2]  # 8 PM
+
+    if not most_recent_draw:
+        # Fallback for manual trigger or missing cron
+        valid_draws = [d for d in draws if d["hour"] <= current_hour]
+        if not valid_draws:
+            print(f"No draws have occurred yet at current hour {current_hour}:00 IST. Nothing to process.")
+            return
+        most_recent_draw = max(valid_draws, key=lambda x: x["hour"])
 
     for draw in draws:
         if draw["time"] != most_recent_draw["time"]:
-            print(f"Skipping {draw['time']}: Only processing the most recent draw ({most_recent_draw['time']}).")
+            print(f"Skipping {draw['time']}: Only processing the target draw ({most_recent_draw['time']}).")
             continue
 
         url = f"https://lottery.sambad.com/pdf/lottery-sambad-{draw['url_part']}-{date_str_url}.pdf"
