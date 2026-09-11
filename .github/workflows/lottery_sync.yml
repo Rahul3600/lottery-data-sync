@@ -2,11 +2,11 @@ name: Lottery Data Sync
 
 on:
   schedule:
-    # Run exactly at the official Nagaland State Lottery draw times (IST)
+    # Run 20 minutes after the official Nagaland State Lottery draw times (IST)
     # IST = UTC + 5:30, so subtract 5:30 from IST to get UTC
-    - cron: '30 7 * * *'   # 1:00 PM IST  (07:30 UTC)
-    - cron: '30 12 * * *'  # 6:00 PM IST  (12:30 UTC)
-    - cron: '30 14 * * *'  # 8:00 PM IST  (14:30 UTC)
+    - cron: '50 7 * * *'   # 1:20 PM IST  (07:50 UTC)
+    - cron: '50 12 * * *'  # 6:20 PM IST  (12:50 UTC)
+    - cron: '50 14 * * *'  # 8:20 PM IST  (14:50 UTC)
   workflow_dispatch:        # Allows you to run this workflow manually from Actions tab
 
 jobs:
@@ -31,4 +31,5 @@ jobs:
           # This pulls the Webhook URL from your GitHub Repository Secrets
           GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
           EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE_CRON: ${{ github.event.schedule }}
         run: python scripts/lottery_fetcher.py
