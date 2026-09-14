@@ -27,7 +27,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
         
       - name: Install dependencies
-        run: pip install requests pytesseract pillow pillow-avif-plugin PyMuPDF
+        run: pip install requests pytesseract pillow pillow-avif-plugin PyMuPDF pytz
         
       - name: Run Dear Lottery fetcher
         if: github.event_name == 'workflow_dispatch' || contains(github.event.schedule, '7') || contains(github.event.schedule, '12') || contains(github.event.schedule, '14')
