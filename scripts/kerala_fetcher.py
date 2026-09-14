@@ -86,7 +86,7 @@ def main():
 
         payload = {
             "action": "insert",
-            "tab_name": "Kerala Lottery",
+            "tab_name": "Kerala Results",
             "data": {
                 "Date": info["date_str"],
                 "Time": "'3:00 PM",
