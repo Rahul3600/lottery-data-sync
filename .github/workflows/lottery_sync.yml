@@ -7,6 +7,9 @@ on:
     - cron: '50 7 * * *'   # 1:20 PM IST  (07:50 UTC)
     - cron: '50 12 * * *'  # 6:20 PM IST  (12:50 UTC)
     - cron: '50 14 * * *'  # 8:20 PM IST  (14:50 UTC)
+    
+    # Run at 4:30 PM IST (11:00 UTC) for Kerala State Lottery
+    - cron: '0 11 * * *'   # 4:30 PM IST  (11:00 UTC)
   workflow_dispatch:        # Allows you to run this workflow manually from Actions tab
 
 jobs:
@@ -26,10 +29,16 @@ jobs:
       - name: Install dependencies
         run: pip install requests pytesseract pillow pillow-avif-plugin PyMuPDF
         
-      - name: Run lottery fetcher
+      - name: Run Dear Lottery fetcher
+        if: github.event_name == 'workflow_dispatch' || contains(github.event.schedule, '7') || contains(github.event.schedule, '12') || contains(github.event.schedule, '14')
         env:
-          # This pulls the Webhook URL from your GitHub Repository Secrets
           GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
           EVENT_NAME: ${{ github.event_name }}
           SCHEDULE_CRON: ${{ github.event.schedule }}
         run: python scripts/lottery_fetcher.py
+
+      - name: Run Kerala Lottery fetcher
+        if: github.event_name == 'workflow_dispatch' || contains(github.event.schedule, '11')
+        env:
+          GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
+        run: python scripts/kerala_fetcher.py
