@@ -54,6 +54,31 @@ def main():
     info = get_kerala_draw_info()
     if not info:
         print("Today's date not found on Kerala Lottery official site. It might be a holiday!")
+        ist = pytz.timezone('Asia/Kolkata')
+        today = datetime.now(ist)
+        payload = {
+            "action": "insert",
+            "tab_name": "Kerala Results",
+            "data": {
+                "Date": today.strftime("%Y-%m-%d"),
+                "Time": "'3:00 PM",
+                "Day": today.strftime("%A").upper(),
+                "Draw No": "HOLIDAY",
+                "Lottery Name": "KERALA STATE LOTTERY",
+                "1st Prize": "HOLIDAY",
+                "Source URL": "HOLIDAY"
+            }
+        }
+        
+        print("Sending HOLIDAY to Google Sheet...")
+        req = urllib.request.Request(webhook_url, method="POST")
+        req.add_header('Content-Type', 'application/json')
+        json_data = json.dumps(payload).encode('utf-8')
+        try:
+            with urllib.request.urlopen(req, data=json_data) as f:
+                print("GAS Response:", f.read().decode('utf-8'))
+        except Exception as e:
+            print("Failed to send HOLIDAY status:", e)
         return
         
     pdf_url = f"https://result.keralalotteries.com/viewlotisresult.php?drawserial={info['draw_serial']}"
