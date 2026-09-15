@@ -10,18 +10,40 @@ import requests
 def get_kerala_draw_info():
     ist = pytz.timezone('Asia/Kolkata')
     today = datetime.now(ist)
+    date_str = today.strftime("%Y-%m-%d")
+    day_str = today.strftime("%A").upper()
+    target_date = today.strftime("%d/%m/%Y")
     
-    # Base date: 2026-07-13 corresponds to draw serial 75318
-    base_date = date(2026, 7, 13)
-    today_date = today.date()
-    diff_days = (today_date - base_date).days
-    draw_serial = 75318 + diff_days
-    
-    return {
-        "draw_serial": draw_serial,
-        "date_str": today.strftime("%Y-%m-%d"),
-        "day_str": today.strftime("%A").upper(),
-    }
+    # Scrape the official Kerala lottery site for today's draw
+    try:
+        html = requests.get('https://result.keralalotteries.com/', timeout=15).text
+        # Look for the exact row with today's date and grab the drawserial
+        # Row format: <td><a href="viewlotisresult.php?drawserial=75379">NAME(XX-12)</a></td> <td>DD/MM/YYYY</td>
+        match = re.search(r'drawserial=(\d+)[^>]*>([^<]+)</a>\s*</td>\s*<td[^>]*>\s*' + re.escape(target_date) + r'\s*</td>', html, re.DOTALL | re.IGNORECASE)
+        
+        if match:
+            draw_serial = int(match.group(1))
+            full_name = match.group(2).strip()
+            
+            lottery_name = "KERALA STATE LOTTERY"
+            draw_no = ""
+            name_match = re.match(r'(.+?)\((.+?)\)', full_name)
+            if name_match:
+                lottery_name = name_match.group(1).strip()
+                draw_no = name_match.group(2).strip()
+            
+            return {
+                "draw_serial": draw_serial,
+                "date_str": date_str,
+                "day_str": day_str,
+                "lottery_name": lottery_name,
+                "draw_no": draw_no
+            }
+        else:
+            return None
+    except Exception as e:
+        print("Failed to scrape Kerala index:", e)
+        return None
 
 def main():
     webhook_url = os.environ.get("GAS_WEBHOOK_URL")
@@ -30,6 +52,10 @@ def main():
         return
 
     info = get_kerala_draw_info()
+    if not info:
+        print("Today's date not found on Kerala Lottery official site. It might be a holiday!")
+        return
+        
     pdf_url = f"https://result.keralalotteries.com/viewlotisresult.php?drawserial={info['draw_serial']}"
     print(f"Fetching Kerala PDF: {pdf_url}")
 
@@ -55,16 +81,8 @@ def main():
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
 
-        # Extract details
-        # Looking for something like: BHAGYATHARA   LOTTERY NO.BT-62nd DRAW
-        lottery_name = "KERALA STATE LOTTERY"
-        draw_no = ""
-        
-        # Extract lottery name and draw no from text
-        header_match = re.search(r'([A-Z\s]+)\s+LOTTERY NO\.([A-Z0-9\-]+)', text)
-        if header_match:
-            lottery_name = header_match.group(1).strip()
-            draw_no = header_match.group(2).strip()
+        lottery_name = info['lottery_name']
+        draw_no = info['draw_no']
 
         # Extract 1st Prize
         first_prize = "N/A"
