@@ -17,26 +17,20 @@ def get_kerala_draw_info():
     # Scrape the official Kerala lottery site for today's draw
     try:
         html = requests.get('https://result.keralalotteries.com/', timeout=15).text
-        # Look for the exact row with today's date and grab the drawserial
-        # Row format: <td><a href="viewlotisresult.php?drawserial=75379">NAME(XX-12)</a></td> <td>DD/MM/YYYY</td>
-        match = re.search(r'drawserial=(\d+)[^>]*>([^<]+)</a>\s*</td>\s*<td[^>]*>\s*' + re.escape(target_date) + r'\s*</td>', html, re.DOTALL | re.IGNORECASE)
+        # Find the row containing today's date, extract the name, and the drawserial
+        # HTML format: <td>LOTTERY_NAME(XX-123)</td> <td>DD/MM/YYYY</td> <td><a href="viewlotisresult.php?drawserial=75380">View</a></td>
+        match = re.search(r'<td[^>]*>\s*([A-Za-z\-]+)\s*\(\s*([^)]+)\s*\)\s*</td>\s*<td[^>]*>\s*' + re.escape(target_date) + r'\s*</td>\s*<td[^>]*>.*?drawserial=(\d+)', html, re.DOTALL | re.IGNORECASE)
         
         if match:
-            draw_serial = int(match.group(1))
-            full_name = match.group(2).strip()
-            
-            lottery_name = "KERALA STATE LOTTERY"
-            draw_no = ""
-            name_match = re.match(r'(.+?)\((.+?)\)', full_name)
-            if name_match:
-                lottery_name = name_match.group(1).strip()
-                draw_no = name_match.group(2).strip()
+            lottery_name = match.group(1).strip()
+            draw_no = match.group(2).strip()
+            draw_serial = int(match.group(3))
             
             return {
                 "draw_serial": draw_serial,
                 "date_str": date_str,
                 "day_str": day_str,
-                "lottery_name": lottery_name,
+                "lottery_name": lottery_name.replace("-", " "),
                 "draw_no": draw_no
             }
         else:
