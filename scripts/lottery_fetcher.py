@@ -4,9 +4,7 @@ import requests
 from datetime import datetime
 
 import io
-from PIL import Image
 import fitz  # PyMuPDF
-import pytesseract
 import re
 from datetime import datetime, timedelta, timezone
 
