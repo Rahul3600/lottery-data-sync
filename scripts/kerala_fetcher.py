@@ -45,11 +45,16 @@ def main():
         print("Error: GAS_WEBHOOK_URL environment variable is not set.")
         return
 
+    ist = pytz.timezone('Asia/Kolkata')
+    today = datetime.now(ist)
+    
     info = get_kerala_draw_info()
     if not info:
+        if today.hour < 16:
+            print(f"Too early to check! It's currently {today.hour}:{today.minute} IST. Kerala results are usually published after 4:00 PM IST.")
+            return
+            
         print("Today's date not found on Kerala Lottery official site. It might be a holiday!")
-        ist = pytz.timezone('Asia/Kolkata')
-        today = datetime.now(ist)
         payload = {
             "action": "insert",
             "tab_name": "Kerala Results",
