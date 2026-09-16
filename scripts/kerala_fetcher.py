@@ -103,23 +103,59 @@ def main():
         lottery_name = info['lottery_name']
         draw_no = info['draw_no']
 
-        # Extract 1st Prize
-        first_prize = "N/A"
+        # Extract Prizes
+        prizes = {
+            "1st Prize": "", "Consolidate Prize": "", "2nd Prize": "", "3rd Prize": "",
+            "4th Prize": "", "5th Prize": "", "6th Prize": "", "7th Prize": "", "8th Prize": "", "9th Prize": ""
+        }
+        current_prize = None
         lines = text.split('\n')
-        for i, line in enumerate(lines):
-            if '1st Prize' in line or '1st  Prize' in line:
-                if i + 1 < len(lines):
-                    winner_line = lines[i+1]
-                    # Matches 2 letters and 6 digits, e.g., BP 540430
-                    matches = re.findall(r'[A-Z]{2}\s*\d{6}', winner_line)
-                    if matches:
-                        first_prize = matches[0]
-                break
-
-        if first_prize == "N/A":
-            print("Could not extract first prize from PDF.")
+        for line in lines:
+            line = line.strip()
+            if not line: continue
             
-        print(f"Extracted -> Name: {lottery_name}, Draw: {draw_no}, 1st Prize: {first_prize}")
+            if '1st Prize' in line or '1st  Prize' in line:
+                current_prize = "1st Prize"
+                continue
+            elif 'Consolation Prize' in line or 'Consolation  Prize' in line or 'Cons Prize' in line:
+                current_prize = "Consolidate Prize"
+                continue
+            elif '2nd Prize' in line or '2nd  Prize' in line:
+                current_prize = "2nd Prize"
+                continue
+            elif '3rd Prize' in line or '3rd  Prize' in line:
+                current_prize = "3rd Prize"
+                continue
+            elif '4th Prize' in line or '4th  Prize' in line:
+                current_prize = "4th Prize"
+                continue
+            elif '5th Prize' in line or '5th  Prize' in line:
+                current_prize = "5th Prize"
+                continue
+            elif '6th Prize' in line or '6th  Prize' in line:
+                current_prize = "6th Prize"
+                continue
+            elif '7th Prize' in line or '7th  Prize' in line:
+                current_prize = "7th Prize"
+                continue
+            elif '8th Prize' in line or '8th  Prize' in line:
+                current_prize = "8th Prize"
+                continue
+            elif '9th Prize' in line or '9th  Prize' in line:
+                current_prize = "9th Prize"
+                continue
+                
+            if current_prize:
+                matches = re.findall(r'[A-Z]{2}\s*\d{6}|\d{4}', line)
+                if matches:
+                    is_ticket = current_prize in ["1st Prize", "Consolidate Prize", "2nd Prize", "3rd Prize"]
+                    joined = " ".join(matches) if is_ticket else ", ".join(matches)
+                    sep = " " if is_ticket else ", "
+                    
+                    if prizes[current_prize]:
+                        prizes[current_prize] += sep + joined
+                    else:
+                        prizes[current_prize] = joined
 
         payload = {
             "action": "insert",
@@ -130,10 +166,14 @@ def main():
                 "Day": info["day_str"],
                 "Draw No": draw_no,
                 "Lottery Name": lottery_name,
-                "1st Prize": first_prize,
                 "Source URL": pdf_url
             }
         }
+        
+        # Add all prizes to payload
+        for key, val in prizes.items():
+            if val:
+                payload["data"][key] = val
 
         print("Sending to Google Sheet...")
         req = urllib.request.Request(webhook_url, method="POST")
