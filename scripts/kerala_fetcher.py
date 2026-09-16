@@ -60,6 +60,15 @@ def main():
                 "Draw No": "HOLIDAY",
                 "Lottery Name": "KERALA STATE LOTTERY",
                 "1st Prize": "HOLIDAY",
+                "Consolidate Prize": "",
+                "2nd Prize": "",
+                "3rd Prize": "",
+                "4th Prize": "",
+                "5th Prize": "",
+                "6th Prize": "",
+                "7th Prize": "",
+                "8th Prize": "",
+                "9th Prize": "",
                 "Source URL": "HOLIDAY"
             }
         }
