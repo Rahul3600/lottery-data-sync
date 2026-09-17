@@ -134,13 +134,39 @@ def process_lottery_image(url):
         third_prize = ", ".join(four_digit_group_lines[:10]) if len(four_digit_group_lines) >= 10 else ", ".join(four_digit_group_lines)
         fourth_prize = ", ".join(four_digit_group_lines[10:20]) if len(four_digit_group_lines) >= 20 else "N/A"
         
+        # --- Extract Lottery Name ---
+        # PDF structure: Lottery name appears as 2 consecutive lines near the bottom
+        # e.g. "SHINE TUESDAY" then "WEEKLY LOTTERY" -> "SHINE TUESDAY WEEKLY LOTTERY"
+        lottery_name = "DEAR"
+        for i, line in enumerate(lines):
+            if "WEEKLY LOTTERY" in line:
+                name_part = lines[i-1].strip() if i > 0 else ""
+                if name_part and not re.search(r'\d', name_part):
+                    lottery_name = f"{name_part} {line.strip()}"
+                else:
+                    lottery_name = line.strip()
+                break
+        
+        # --- Extract Draw No ---
+        # PDF structure: Draw No is near the very last line (e.g. "46"), usually before the watermark
+        draw_no = "Live"
+        for line in reversed(lines):
+            last_line = line.strip()
+            if re.match(r'^\d{2,3}$', last_line):
+                draw_no = last_line
+                break
+        
         print(f"  1st: {first_prize}")
         print(f"  2nd: {len(five_digit_blocks)} numbers")
         print(f"  3rd: {len(four_digit_group_lines[:10])} numbers")
         print(f"  4th: {len(four_digit_group_lines[10:20])} numbers")
         print(f"  5th: {len(fifth_prize_list)} numbers")
+        print(f"  Name: {lottery_name}")
+        print(f"  Draw No: {draw_no}")
         
         return {
+            "Lottery Name": lottery_name,
+            "Draw No": draw_no,
             "1st Prize": first_prize,
             "2nd Prize": second_prize,
             "3rd Prize": third_prize if third_prize else "N/A",
@@ -170,8 +196,8 @@ def main():
 
     draws = [
         {"time": "1:00 PM", "name": "DEAR MORNING", "url_part": "1pm", "hour": 13},
-        {"time": "6:00 PM", "name": "DEAR DAY", "url_part": "6pm", "hour": 18},
-        {"time": "8:00 PM", "name": "DEAR NIGHT", "url_part": "8pm", "hour": 20}
+        {"time": "6:00 PM", "name": "DEAR DAY",     "url_part": "6pm", "hour": 18},
+        {"time": "8:00 PM", "name": "DEAR NIGHT",   "url_part": "8pm", "hour": 20}
     ]
 
     current_hour = today_date.hour
@@ -207,16 +233,17 @@ def main():
         if ocr_prizes:
             data = {
                 "Date": date_str_sheets,
-                # Prepend a single quote to force Google Sheets to treat this as plain text, 
+                # Prepend a single quote to force Google Sheets to treat this as plain text,
                 # otherwise it auto-converts "1:00 PM" into 24-hour format (13:00)
-                "Time": f"'{draw['time']}", 
+                "Time": f"'{draw['time']}",
                 "Day": day_str,
-                "Draw No": "Live",
-                "Lottery Name": draw["name"],
-                "source_url": url
+                "Draw No": ocr_prizes.get("Draw No", "Live"),
+                "Lottery Name": ocr_prizes.get("Lottery Name", draw["name"])
             }
             # Merge the OCR extracted prizes into our payload
             data.update(ocr_prizes)
+            # Add Source URL at the end so it appears as the last column in the sheet
+            data["source_url"] = url
             send_to_gas(f"Results {draw['time']}", data)
         else:
             print(f"Skipping {draw['time']}: PDF not available yet or extraction failed.")
