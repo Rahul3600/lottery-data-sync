@@ -19,11 +19,22 @@ def get_kerala_draw_info():
         html = requests.get('https://result.keralalotteries.com/', timeout=15).text
         # Find the row containing today's date, extract the name, and the drawserial
         # HTML format: <td>LOTTERY_NAME(XX-123)</td> <td>DD/MM/YYYY</td> <td><a href="viewlotisresult.php?drawserial=75380">View</a></td>
-        match = re.search(r'<td[^>]*>\s*([A-Za-z\-]+)\s*\(\s*([^)]+)\s*\)\s*</td>\s*<td[^>]*>\s*' + re.escape(target_date) + r'\s*</td>\s*<td[^>]*>.*?drawserial=(\d+)', html, re.DOTALL | re.IGNORECASE)
+        match = re.search(r'<td[^>]*>\s*([A-Za-z\-\s]+)\s*\(\s*([^)]+)\s*\)\s*</td>\s*<td[^>]*>\s*' + re.escape(target_date) + r'\s*</td>\s*<td[^>]*>.*?drawserial=(\d+)', html, re.DOTALL | re.IGNORECASE)
         
         if match:
             lottery_name = match.group(1).strip()
             draw_no = match.group(2).strip()
+            
+            # Add ordinal suffix to Draw No (e.g. SS-535 -> SS-535th)
+            m = re.search(r'(\d+)$', draw_no)
+            if m:
+                n = int(m.group(1))
+                if 11 <= (n % 100) <= 13:
+                    suf = "th"
+                else:
+                    suf = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+                draw_no += suf
+                
             draw_serial = int(match.group(3))
             
             return {
@@ -160,6 +171,10 @@ def main():
                 continue
                 
             if current_prize:
+                # Skip page headers/footers and date lines
+                if '/' in line or ':' in line or 'Page' in line:
+                    continue
+                    
                 matches = re.findall(r'[A-Z]{2}\s*\d{6}|\d{4}', line)
                 if matches:
                     is_ticket = current_prize in ["1st Prize", "Consolidate Prize", "2nd Prize", "3rd Prize"]
@@ -179,8 +194,7 @@ def main():
                 "Time": "'3:00 PM",
                 "Day": info["day_str"],
                 "Draw No": draw_no,
-                "Lottery Name": lottery_name,
-                "Source URL": pdf_url
+                "Lottery Name": lottery_name
             }
         }
         
@@ -188,6 +202,8 @@ def main():
         for key, val in prizes.items():
             if val:
                 payload["data"][key] = val
+
+        payload["data"]["Source URL"] = pdf_url
 
         print("Sending to Google Sheet...")
         req = urllib.request.Request(webhook_url, method="POST")
