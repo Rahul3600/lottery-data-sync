@@ -38,7 +38,7 @@ def fetch_gas_tab():
         resp = requests.get(GAS_WEBHOOK_URL, timeout=20)
         resp.raise_for_status()
         data = resp.json()
-        results = data.get("data", {}).get("results", [])
+        results = data.get("dynamic_data", {}).get(RESULTS_TAB, [])
         return [r for r in results if r.get("lottery_type") == "KERALA_3PM" or "KERALA" in str(r.get("lottery_name", "")).upper()]
     except Exception as e:
         print(f"  [WARN] GAS fetch failed: {e}")
