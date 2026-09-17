@@ -28,7 +28,8 @@ jobs:
         
       - name: Install dependencies
         run: pip install requests PyMuPDF pytz
-        
+
+      # ── Step 1: Fetch Dear Lottery result ──────────────────────────────────
       - name: Run Dear Lottery fetcher
         if: github.event_name == 'workflow_dispatch' || contains(github.event.schedule, '7') || contains(github.event.schedule, '12') || contains(github.event.schedule, '14')
         env:
@@ -37,8 +38,25 @@ jobs:
           SCHEDULE_CRON: ${{ github.event.schedule }}
         run: python scripts/lottery_fetcher.py
 
+      # ── Step 2: Generate Dear Lottery predictions (after result is saved) ──
+      - name: Run Dear Lottery predictor
+        if: github.event_name == 'workflow_dispatch' || contains(github.event.schedule, '7') || contains(github.event.schedule, '12') || contains(github.event.schedule, '14')
+        env:
+          GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE_CRON: ${{ github.event.schedule }}
+        run: python scripts/dear_predictor.py
+
+      # ── Step 3: Fetch Kerala Lottery result ────────────────────────────────
       - name: Run Kerala Lottery fetcher
         if: github.event_name == 'workflow_dispatch' || contains(github.event.schedule, '11')
         env:
           GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
         run: python scripts/kerala_fetcher.py
+
+      # ── Step 4: Generate Kerala Lottery predictions ────────────────────────
+      - name: Run Kerala Lottery predictor
+        if: github.event_name == 'workflow_dispatch' || contains(github.event.schedule, '11')
+        env:
+          GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
+        run: python scripts/kerala_predictor.py
