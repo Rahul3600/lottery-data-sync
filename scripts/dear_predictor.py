@@ -83,10 +83,16 @@ def parse_historical(rows, today, weekday_int):
         # Day-of-week bonus (0=Mon … 6=Sun)
         same_day_bonus = 2 if row_date.weekday() == weekday_int else 0
 
-        # 5th Prize
-        fifth = str(row.get("fifth_prize", "") or row.get("5th Prize", ""))
-        nums4 = [n for n in re.findall(r'\b\d{4}\b', fifth)
-                 if n not in ('2023', '2024', '2025', '2026', '2027')]
+        # All Prizes (2nd to 5th) to gather 4-digit numbers
+        all_prize_text = " ".join([
+            str(row.get("second_prize", "") or row.get("2nd Prize", "")),
+            str(row.get("third_prize", "") or row.get("3rd Prize", "")),
+            str(row.get("fourth_prize", "") or row.get("4th Prize", "")),
+            str(row.get("fifth_prize", "") or row.get("5th Prize", ""))
+        ])
+        nums4 = [n[-4:] for n in re.findall(r'\b\d{4,5}\b', all_prize_text)
+                 if len(n) >= 4 and n not in ('2023', '2024', '2025', '2026', '2027')]
+        
         for n in nums4:
             score = rec + same_day_bonus + 1  # +1 frequency base
             fifth_scored.append((n, score))
