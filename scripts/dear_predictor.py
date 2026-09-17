@@ -37,15 +37,13 @@ DRAWS = [
 ]
 
 
-# ── Fetch data from GAS (GET request) ─────────────────────────────────────────
 def fetch_gas_tab(draw_time):
     """Returns list of row dicts from GAS results."""
     try:
         resp = requests.get(GAS_WEBHOOK_URL, timeout=20)
         resp.raise_for_status()
         data = resp.json()
-        results = data.get("data", {}).get("results", [])
-        # Filter for this specific draw time
+        results = data.get("dynamic_data", {}).get(f"Results {draw_time}", [])
         return [row for row in results if row.get("time") == draw_time or row.get("Time") == draw_time]
     except Exception as e:
         print(f"  [WARN] GAS fetch failed: {e}")
