@@ -233,55 +233,56 @@ def main():
     schedule_cron = os.environ.get("SCHEDULE_CRON", "")
     current_hour  = today.hour
 
-    # Determine which draw to process
-    target_draw = None
+    # Determine which draw(s) to process
+    # On 'workflow_dispatch' (manual run): process ALL 3 draws
+    # On 'schedule' cron: process only the specific triggered draw
     if event_name == "schedule" and schedule_cron:
-        if "7"  in schedule_cron: target_draw = DRAWS[0]
-        elif "12" in schedule_cron: target_draw = DRAWS[1]
-        elif "14" in schedule_cron: target_draw = DRAWS[2]
-    if not target_draw:
-        past = [d for d in DRAWS if d["hour"] <= current_hour]
-        target_draw = past[-1] if past else DRAWS[0]
+        if "7"  in schedule_cron: target_draws = [DRAWS[0]]
+        elif "12" in schedule_cron: target_draws = [DRAWS[1]]
+        elif "14" in schedule_cron: target_draws = [DRAWS[2]]
+        else: target_draws = DRAWS
+    else:
+        # Manual trigger — run all 3 draws
+        target_draws = DRAWS
 
-    draw = target_draw
-    results_tab = f"Results {draw['time']}"
-    pred_tab    = draw["tab"]
+    for draw in target_draws:
+        results_tab = f"Results {draw['time']}"
+        pred_tab    = draw["tab"]
 
-    print(f"\n[DEAR PREDICTOR v2] {draw['time']} — {date_str} ({day_str})")
-    print(f"  Source tab : '{results_tab}'  |  History: {HISTORY_DAYS} days")
+        print(f"\n[DEAR PREDICTOR v2] {draw['time']} — {date_str} ({day_str})")
+        print(f"  Source tab : '{results_tab}'  |  History: {HISTORY_DAYS} days")
 
-    rows = fetch_gas_tab(results_tab)
-    print(f"  Rows fetched: {len(rows)}")
+        rows = fetch_gas_tab(results_tab)
+        print(f"  Rows fetched: {len(rows)}")
 
-    fifth_scored, first_leading_map = parse_historical(rows, today, weekday_int)
-    print(f"  5th-prize data points: {len(fifth_scored)}")
+        fifth_scored, first_leading_map = parse_historical(rows, today, weekday_int)
+        print(f"  5th-prize data points: {len(fifth_scored)}")
 
-    # Flatten scores for SUPER VIP ranking
-    score_flat = Counter()
-    for num4, sc in fifth_scored:
-        score_flat[num4] += sc
+        score_flat = Counter()
+        for num4, sc in fifth_scored:
+            score_flat[num4] += sc
 
-    four_pred  = build_four_digit_predictions(fifth_scored)
-    five_pred  = build_five_digit_predictions(four_pred, first_leading_map)
-    super_vip  = build_super_vip(five_pred, score_flat)
-    matrix     = build_middle_matrix()
+        four_pred = build_four_digit_predictions(fifth_scored)
+        five_pred = build_five_digit_predictions(four_pred, first_leading_map)
+        super_vip = build_super_vip(five_pred, score_flat)
+        matrix    = build_middle_matrix()
 
-    print(f"  4-Digit count : {len(four_pred)}")
-    print(f"  5-Digit count : {len(five_pred)}")
-    print(f"  SUPER VIP     : {super_vip}")
+        print(f"  4-Digit count : {len(four_pred)}")
+        print(f"  5-Digit count : {len(five_pred)}")
+        print(f"  SUPER VIP     : {super_vip}")
 
-    data = {
-        "Date":                  date_str,
-        "Time":                  f"'{draw['time']}",
-        "Day":                   day_str,
-        "Middle Matrix":         matrix,
-        "5 Digit Prediction":    fmt(five_pred),
-        "4 Digit Prediction":    fmt(four_pred),
-        "SUPER VIP PREDICTION":  fmt(super_vip),
-    }
+        data = {
+            "Date":                  date_str,
+            "Time":                  f"'{draw['time']}",
+            "Day":                   day_str,
+            "Middle Matrix":         matrix,
+            "5 Digit Prediction":    fmt(five_pred),
+            "4 Digit Prediction":    fmt(four_pred),
+            "SUPER VIP PREDICTION":  fmt(super_vip),
+        }
 
-    send_to_gas(pred_tab, data)
-    print(f"  [DONE] → '{pred_tab}'")
+        send_to_gas(pred_tab, data)
+        print(f"  [DONE] -> '{pred_tab}'")
 
 
 if __name__ == "__main__":
