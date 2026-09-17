@@ -2,45 +2,56 @@ name: Lottery Data Sync
 
 on:
   schedule:
-    # Run 20 minutes after the official Nagaland State Lottery draw times (IST)
-    # IST = UTC + 5:30, so subtract 5:30 from IST to get UTC
-    - cron: '50 7 * * *'   # 1:20 PM IST  (07:50 UTC)
-    - cron: '50 12 * * *'  # 6:20 PM IST  (12:50 UTC)
-    - cron: '50 14 * * *'  # 8:20 PM IST  (14:50 UTC)
-    
-    # Run at 4:30 PM IST (11:00 UTC) for Kerala State Lottery
-    - cron: '0 11 * * *'   # 4:30 PM IST  (11:00 UTC)
-  workflow_dispatch:        # Allows you to run this workflow manually from Actions tab
+    # ── Result fetchers (run after official draw times, IST = UTC+5:30) ──
+    - cron: '50 7 * * *'   # 1:20 PM IST  (07:50 UTC) — Dear 1 PM draw
+    - cron: '50 12 * * *'  # 6:20 PM IST  (12:50 UTC) — Dear 6 PM draw
+    - cron: '50 14 * * *'  # 8:20 PM IST  (14:50 UTC) — Dear 8 PM draw
+    - cron: '0 11 * * *'   # 4:30 PM IST  (11:00 UTC) — Kerala draw
+
+    # ── Prediction-only run at midnight IST (all 3 Dear + Kerala) ──────
+    # Runs at 12:00 AM IST (6:30 PM UTC previous day) to ensure predictions
+    # are ready in the Sheet well before users open the app in the morning.
+    - cron: '30 18 * * *'  # 12:00 AM IST (18:30 UTC) — Midnight predictions
+
+  workflow_dispatch:        # Allows manual trigger from GitHub Actions tab
 
 jobs:
   sync-lottery-data:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
-        
+
       - name: Install dependencies
         run: pip install requests PyMuPDF pytz
 
       # ── Step 1: Fetch Dear Lottery result ──────────────────────────────────
+      # Skipped on the midnight-only cron ('18' UTC = midnight IST)
       - name: Run Dear Lottery fetcher
-        if: github.event_name == 'workflow_dispatch' || contains(github.event.schedule, '7') || contains(github.event.schedule, '12') || contains(github.event.schedule, '14')
+        if: >
+          github.event_name == 'workflow_dispatch' ||
+          contains(github.event.schedule, '7') ||
+          contains(github.event.schedule, '12') ||
+          contains(github.event.schedule, '14')
         env:
           GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
           EVENT_NAME: ${{ github.event_name }}
           SCHEDULE_CRON: ${{ github.event.schedule }}
         run: python scripts/lottery_fetcher.py
 
-      # ── Step 2: Generate Dear Lottery predictions (after result is saved) ──
+      # ── Step 2: Generate Dear Lottery predictions ───────────────────────────
+      # Runs after result fetchers AND on the midnight cron for next-day prep
       - name: Run Dear Lottery predictor
-        if: github.event_name == 'workflow_dispatch' || contains(github.event.schedule, '7') || contains(github.event.schedule, '12') || contains(github.event.schedule, '14')
+        if: >
+          github.event_name == 'workflow_dispatch' ||
+          contains(github.event.schedule, '7') ||
+          contains(github.event.schedule, '12') ||
+          contains(github.event.schedule, '14') ||
+          contains(github.event.schedule, '18')
         env:
           GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
           EVENT_NAME: ${{ github.event_name }}
@@ -48,15 +59,22 @@ jobs:
         run: python scripts/dear_predictor.py
 
       # ── Step 3: Fetch Kerala Lottery result ────────────────────────────────
+      # Skipped on the midnight cron
       - name: Run Kerala Lottery fetcher
-        if: github.event_name == 'workflow_dispatch' || contains(github.event.schedule, '11')
+        if: >
+          github.event_name == 'workflow_dispatch' ||
+          contains(github.event.schedule, '11')
         env:
           GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
         run: python scripts/kerala_fetcher.py
 
       # ── Step 4: Generate Kerala Lottery predictions ────────────────────────
+      # Runs after Kerala fetcher AND on the midnight cron for next-day prep
       - name: Run Kerala Lottery predictor
-        if: github.event_name == 'workflow_dispatch' || contains(github.event.schedule, '11')
+        if: >
+          github.event_name == 'workflow_dispatch' ||
+          contains(github.event.schedule, '11') ||
+          contains(github.event.schedule, '18')
         env:
           GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
         run: python scripts/kerala_predictor.py
