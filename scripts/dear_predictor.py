@@ -70,7 +70,7 @@ def parse_historical(rows, today, weekday_int):
             row_date = datetime.strptime(raw_date[:10], "%Y-%m-%d").replace(tzinfo=IST)
         except ValueError:
             continue
-        if row_date < cutoff:
+        if row_date < cutoff or row_date >= today:
             continue
 
         age_days = (today - row_date).days
