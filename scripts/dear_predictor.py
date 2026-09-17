@@ -38,13 +38,15 @@ DRAWS = [
 
 
 # ── Fetch data from GAS (GET request) ─────────────────────────────────────────
-def fetch_gas_tab(tab_name):
-    """Returns list of row dicts from GAS dynamic_data for a tab."""
+def fetch_gas_tab(draw_time):
+    """Returns list of row dicts from GAS results."""
     try:
         resp = requests.get(GAS_WEBHOOK_URL, timeout=20)
         resp.raise_for_status()
         data = resp.json()
-        return data.get("dynamic_data", {}).get(tab_name, [])
+        results = data.get("data", {}).get("results", [])
+        # Filter for this specific draw time
+        return [row for row in results if row.get("time") == draw_time or row.get("Time") == draw_time]
     except Exception as e:
         print(f"  [WARN] GAS fetch failed: {e}")
         return []
@@ -256,9 +258,10 @@ def main():
         pred_tab    = draw["tab"]
 
         print(f"\n[DEAR PREDICTOR v2] {draw['time']} — {date_str} ({day_str})")
-        print(f"  Source tab : '{results_tab}'  |  History: {HISTORY_DAYS} days")
+        print(f"\n[DEAR PREDICTOR v2] {date_str} ({day_str})  |  History: {HISTORY_DAYS} days")
 
-        rows = fetch_gas_tab(results_tab)
+        # Now fetch_gas_tab uses the time string, e.g. "1:00 PM"
+        rows = fetch_gas_tab(draw["time"])
         print(f"  Rows fetched: {len(rows)}")
 
         fifth_scored, first_leading_map = parse_historical(rows, today, weekday_int)
