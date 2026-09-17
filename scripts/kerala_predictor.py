@@ -33,12 +33,13 @@ SERIES     = ["SB", "XC", "DF"]
 HISTORY_DAYS = 180
 
 
-# ── Fetch Kerala Results rows from GAS ───────────────────────────────────────
-def fetch_gas_tab(tab_name):
+def fetch_gas_tab():
     try:
         resp = requests.get(GAS_WEBHOOK_URL, timeout=20)
         resp.raise_for_status()
-        return resp.json().get("dynamic_data", {}).get(tab_name, [])
+        data = resp.json()
+        results = data.get("data", {}).get("results", [])
+        return [r for r in results if r.get("lottery_type") == "KERALA_3PM" or "KERALA" in str(r.get("lottery_name", "")).upper()]
     except Exception as e:
         print(f"  [WARN] GAS fetch failed: {e}")
         return []
@@ -150,7 +151,7 @@ def main():
 
     print(f"\n[KERALA PREDICTOR v2] {date_str} ({day_str})  |  History: {HISTORY_DAYS} days")
 
-    rows = fetch_gas_tab(RESULTS_TAB)
+    rows = fetch_gas_tab()
     print(f"  Rows fetched: {len(rows)}")
 
     scores, most_recent = parse_scored_endings(rows, today, weekday_int)
