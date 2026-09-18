@@ -25,7 +25,6 @@ import requests
 from datetime import datetime, timedelta, timezone
 from collections import Counter
 
-GAS_WEBHOOK_URL = os.environ.get("GAS_WEBHOOK_URL")
 IST = timezone(timedelta(hours=5, minutes=30))
 PRED_TAB   = "Predictions Kerala (4 PM)"
 RESULTS_TAB = "Kerala Results"
@@ -35,11 +34,12 @@ HISTORY_DAYS = 180
 
 def fetch_gas_tab():
     try:
-        resp = requests.get(GAS_WEBHOOK_URL, timeout=20)
+        url = os.environ.get("GAS_WEBHOOK_URL")
+        resp = requests.get(url, timeout=20)
         resp.raise_for_status()
         data = resp.json()
         results = data.get("dynamic_data", {}).get(RESULTS_TAB, [])
-        return [r for r in results if r.get("lottery_type") == "KERALA_3PM" or "KERALA" in str(r.get("lottery_name", "")).upper()]
+        return results
     except Exception as e:
         print(f"  [WARN] GAS fetch failed: {e}")
         return []
@@ -143,7 +143,8 @@ def send_to_gas(data_dict):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
-    if not GAS_WEBHOOK_URL:
+    url = os.environ.get("GAS_WEBHOOK_URL")
+    if not url:
         print("ERROR: GAS_WEBHOOK_URL not set.")
         return
 
