@@ -218,9 +218,11 @@ def fmt(lst):
 
 # ── Send to GAS ───────────────────────────────────────────────────────────────
 def send_to_gas(tab_name, data_dict):
+    """Sends the prediction data to the GAS webhook."""
     payload = {"action": "insert", "tab_name": tab_name, "data": data_dict}
     try:
-        resp = requests.post(GAS_WEBHOOK_URL, json=payload,
+        url = os.environ.get("GAS_WEBHOOK_URL")
+        resp = requests.post(url, json=payload,
                              headers={"Content-Type": "application/json"}, timeout=20)
         print(f"  GAS: {resp.status_code} — {resp.text[:120]}")
     except Exception as e:
