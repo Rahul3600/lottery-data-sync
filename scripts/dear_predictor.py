@@ -26,7 +26,6 @@ import requests
 from datetime import datetime, timedelta, timezone
 from collections import Counter, defaultdict
 
-GAS_WEBHOOK_URL = os.environ.get("GAS_WEBHOOK_URL")
 IST = timezone(timedelta(hours=5, minutes=30))
 HISTORY_DAYS = 180
 
@@ -40,7 +39,8 @@ DRAWS = [
 def fetch_gas_tab(draw_time):
     """Returns list of row dicts from GAS results."""
     try:
-        resp = requests.get(GAS_WEBHOOK_URL, timeout=20)
+        url = os.environ.get("GAS_WEBHOOK_URL")
+        resp = requests.get(url, timeout=20)
         resp.raise_for_status()
         data = resp.json()
         results = data.get("dynamic_data", {}).get(f"Results {draw_time}", [])
@@ -229,7 +229,8 @@ def send_to_gas(tab_name, data_dict):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
-    if not GAS_WEBHOOK_URL:
+    url = os.environ.get("GAS_WEBHOOK_URL")
+    if not url:
         print("ERROR: GAS_WEBHOOK_URL not set.")
         return
 
