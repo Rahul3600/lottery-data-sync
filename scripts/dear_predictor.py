@@ -69,7 +69,10 @@ def parse_historical(rows, today, weekday_int):
         try:
             row_date = datetime.strptime(raw_date[:10], "%Y-%m-%d").replace(tzinfo=IST)
         except ValueError:
-            continue
+            try:
+                row_date = datetime.strptime(raw_date[:10], "%d/%m/%Y").replace(tzinfo=IST)
+            except ValueError:
+                continue
         if row_date < cutoff or row_date >= today:
             continue
 
