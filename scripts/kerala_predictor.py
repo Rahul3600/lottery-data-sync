@@ -172,8 +172,8 @@ def main():
         "Date":                     date_str,
         "Time":                     "'3:00 PM",   # quote prefix prevents GAS time conversion
         "Day":                      day_str,
-        "4-Digit Endings (Top 30)": ", ".join(top30),
-        "6-Digit VIP Numbers":      ", ".join(vip),
+        "4 Digit Prediction":       ", ".join(top30),
+        "Super VIP Prediction":     ", ".join(vip),
     }
 
     send_to_gas(data)
