@@ -145,7 +145,7 @@ def main():
         return
 
     today       = datetime.now(IST)
-    date_str    = today.strftime("%d/%m/%Y")  # Kerala format
+    date_str    = today.strftime("%Y-%m-%d")
     day_str     = today.strftime("%A").upper()
     weekday_int = today.weekday()
 
@@ -172,8 +172,8 @@ def main():
         "Date":                     date_str,
         "Time":                     "'3:00 PM",   # quote prefix prevents GAS time conversion
         "Day":                      day_str,
-        "4 Digit Prediction":       ", ".join(top30),
-        "Super VIP Prediction":     ", ".join(vip),
+        "4-Digit Endings (Top 30)": ", ".join(top30),
+        "6-Digit VIP Numbers":      ", ".join(vip),
     }
 
     send_to_gas(data)
