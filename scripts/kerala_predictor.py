@@ -130,9 +130,11 @@ def build_vip(top30):
 
 # ── Send to GAS ───────────────────────────────────────────────────────────────
 def send_to_gas(data_dict):
+    """Sends the prediction data to the GAS webhook."""
     payload = {"action": "insert", "tab_name": PRED_TAB, "data": data_dict}
     try:
-        req = urllib.request.Request(GAS_WEBHOOK_URL, method="POST")
+        url = os.environ.get("GAS_WEBHOOK_URL")
+        req = urllib.request.Request(url, method="POST")
         req.add_header("Content-Type", "application/json")
         body = json.dumps(payload).encode("utf-8")
         with urllib.request.urlopen(req, data=body) as f:
