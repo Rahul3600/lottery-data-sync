@@ -280,12 +280,12 @@ def main():
 
         data = {
             "Date":                  date_str,
-            "Time":                  f"'{draw['time']}",
+            "Time":                  f"'{draw['time']}",  # Single quote prevents 24h format conversion
             "Day":                   day_str,
-            "Middle Matrix":         matrix,
-            "5 Digit Prediction":    fmt(five_pred),
-            "4 Digit Prediction":    fmt(four_pred),
-            "SUPER VIP PREDICTION":  fmt(super_vip),
+            "Middle Matrix":         middle_matrix_str,
+            "5 Digit Prediction":    five_digit_str,
+            "4 Digit Prediction":    four_digit_str,
+            "SUPER VIP PREDICTION":  super_vip_str,
         }
 
         send_to_gas(pred_tab, data)
