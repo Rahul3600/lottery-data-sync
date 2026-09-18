@@ -65,39 +65,7 @@ def main():
             print(f"Too early to check! It's currently {today.hour}:{today.minute} IST. Kerala results are usually published after 4:00 PM IST.")
             return
             
-        print("Today's date not found on Kerala Lottery official site. It might be a holiday!")
-        payload = {
-            "action": "insert",
-            "tab_name": "Kerala Results",
-            "data": {
-                "Date": today.strftime("%Y-%m-%d"),
-                "Time": "'3:00 PM",
-                "Day": today.strftime("%A").upper(),
-                "Draw No": "HOLIDAY",
-                "Lottery Name": "KERALA STATE LOTTERY",
-                "1st Prize": "HOLIDAY",
-                "Consolidate Prize": "",
-                "2nd Prize": "",
-                "3rd Prize": "",
-                "4th Prize": "",
-                "5th Prize": "",
-                "6th Prize": "",
-                "7th Prize": "",
-                "8th Prize": "",
-                "9th Prize": "",
-                "Source URL": "HOLIDAY"
-            }
-        }
-        
-        print("Sending HOLIDAY to Google Sheet...")
-        req = urllib.request.Request(webhook_url, method="POST")
-        req.add_header('Content-Type', 'application/json')
-        json_data = json.dumps(payload).encode('utf-8')
-        try:
-            with urllib.request.urlopen(req, data=json_data) as f:
-                print("GAS Response:", f.read().decode('utf-8'))
-        except Exception as e:
-            print("Failed to send HOLIDAY status:", e)
+        print("Today's date not found on Kerala Lottery official site. It might be a holiday! Skipping data insertion.")
         return
         
     pdf_url = f"https://result.keralalotteries.com/viewlotisresult.php?drawserial={info['draw_serial']}"
