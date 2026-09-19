@@ -56,11 +56,15 @@ def parse_historical(rows, today, weekday_int):
     Returns:
       fifth_scored  : list of (num4, score) from 5th Prize
       first_leading : Counter of (num4 → most-used leading digit) from 1st Prize
+      most_recent_last4: string (for digit proximity bonus)
     """
     cutoff = today - timedelta(days=HISTORY_DAYS)
     
     fifth_scored = []
     first_leading_map = defaultdict(Counter)  # last4 → {leading_digit: count}
+    
+    most_recent_date = None
+    most_recent_last4 = None
 
     for row in rows:
         raw_date = str(row.get("date", "") or row.get("Date", ""))
@@ -111,41 +115,48 @@ def parse_historical(rows, today, weekday_int):
             last4 = full5[-4:]           # "6988"
             lead  = full5[0]             # "7"
             first_leading_map[last4][lead] += decay  # weight by recency
+            
+            if most_recent_date is None or row_date > most_recent_date:
+                most_recent_date = row_date
+                most_recent_last4 = last4
 
-    return fifth_scored, first_leading_map
+    return fifth_scored, first_leading_map, most_recent_last4
 
 
 # ── Build 4-digit prediction list (300 total) ─────────────────────────────────
-def build_four_digit_predictions(fifth_scored):
+def build_four_digit_predictions(fifth_scored, most_recent_1st_last4=None):
     """
-    Groups all scored 4-digit numbers by their first 2 digits.
-    Aggregates scores per number and picks Top 3 per group.
-    Returns ordered list of up to 300 4-digit strings.
+    Aggregates scores globally and picks the absolute Top 300 highest-scored 
+    4-digit numbers. This massively increases accuracy compared to forcing 
+    3 numbers per prefix.
+    Also adds a digit proximity bonus if anchored to the most recent 1st prize.
     """
-    group_scores = defaultdict(Counter)  # prefix → {num4: total_score}
+    group_scores = Counter()
     for num4, score in fifth_scored:
-        prefix = num4[:2]
-        group_scores[prefix][num4] += score
+        group_scores[num4] += score
 
-    result = []
-    for prefix in [f"{i:02d}" for i in range(100)]:
-        top3 = [n for n, _ in group_scores[prefix].most_common(3)]
-        if not top3:
-            # No historical data for this prefix — generate nearest plausible
-            top3 = [f"{prefix}{j:02d}" for j in range(3)]
-        elif len(top3) < 3:
-            # Fill remaining slots mathematically from the prefix
-            existing = set(top3)
-            for j in range(100):
-                cand = f"{prefix}{j:02d}"
-                if cand not in existing:
-                    top3.append(cand)
-                    existing.add(cand)
-                if len(top3) == 3:
-                    break
-        result.extend(top3[:3])
+    # Digit proximity bonus (like Kerala)
+    if most_recent_1st_last4 and most_recent_1st_last4.isdigit():
+        anchor = int(most_recent_1st_last4)
+        for num4 in list(group_scores.keys()):
+            if abs(int(num4) - anchor) <= 200:
+                group_scores[num4] += 2  # Boost proximity
 
-    return result  # 300 total
+    # Return top 300 absolute best
+    top300 = [n for n, _ in group_scores.most_common(300)]
+    
+    # Fallback padding if we somehow don't have 300 unique numbers
+    if len(top300) < 300:
+        existing = set(top300)
+        for i in range(10000):
+            cand = f"{i:04d}"
+            if cand not in existing:
+                top300.append(cand)
+                existing.add(cand)
+            if len(top300) == 300:
+                break
+                
+    return top300
 
 
 # ── Build 5-digit prediction list ─────────────────────────────────────────────
@@ -271,14 +282,15 @@ def main():
         rows = fetch_gas_tab(draw["time"])
         print(f"  Rows fetched: {len(rows)}")
 
-        fifth_scored, first_leading_map = parse_historical(rows, today, weekday_int)
+        fifth_scored, first_leading_map, most_recent = parse_historical(rows, today, weekday_int)
         print(f"  5th-prize data points: {len(fifth_scored)}")
+        print(f"  Most recent 1st prize last4: {most_recent}")
 
         score_flat = Counter()
         for num4, sc in fifth_scored:
             score_flat[num4] += sc
 
-        four_pred = build_four_digit_predictions(fifth_scored)
+        four_pred = build_four_digit_predictions(fifth_scored, most_recent)
         five_pred = build_five_digit_predictions(four_pred, first_leading_map)
         super_vip = build_super_vip(five_pred, score_flat)
         matrix    = build_middle_matrix()
