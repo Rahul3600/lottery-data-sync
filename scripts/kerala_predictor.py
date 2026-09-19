@@ -72,20 +72,39 @@ def parse_scored_endings(rows, today, weekday_int):
         if row_date < cutoff or row_date >= today:
             continue
 
-        # Extract last 4 of the 6-digit Kerala 1st prize
-        nums6 = re.findall(r'\d{6}', first)
-        if not nums6:
-            continue
-        last4 = nums6[0][-4:]
+        # Extract last 4 digits of all numbers from all prizes
+        all_prizes = " ".join([
+            first,
+            str(row.get("2nd Prize", "") or row.get("second_prize", "")),
+            str(row.get("3rd Prize", "") or row.get("third_prize", "")),
+            str(row.get("4th Prize", "") or row.get("fourth_prize", "")),
+            str(row.get("5th Prize", "") or row.get("fifth_prize", "")),
+            str(row.get("6th Prize", "") or row.get("sixth_prize", "")),
+            str(row.get("7th Prize", "") or row.get("seventh_prize", "")),
+            str(row.get("8th Prize", "") or row.get("eighth_prize", "")),
+            str(row.get("9th Prize", "") or row.get("ninth_prize", "")),
+            str(row.get("Consolidate Prize", "") or row.get("consolidate_prize", ""))
+        ])
+        
+        all_last4s = [n[-4:] for n in re.findall(r'\b\d{4,6}\b', all_prizes) if len(n) >= 4]
 
         age_days = (today - row_date).days
-        if age_days <= 7:    rec = 8
+        # Optimized weights from ML Optimizer
+        if age_days <= 7:    rec = 5
         elif age_days <= 14: rec = 4
         elif age_days <= 30: rec = 2
         else:                rec = 1
 
         same_day = 2 if row_date.weekday() == weekday_int else 0
-        scores[last4] += rec + same_day + 1  # +1 base frequency
+        
+        for n in all_last4s:
+            scores[n] += rec + same_day + 1  # +1 base frequency
+
+        # Anchor for digit proximity is still the 1st prize
+        last4 = None
+        if first and first not in ("HOLIDAY", "N/A"):
+            nums6 = re.findall(r'\b\d{6}\b', first)
+            if nums6: last4 = nums6[0][-4:]
 
         # Track most recent result
         if most_recent_date is None or row_date > most_recent_date:
@@ -97,31 +116,30 @@ def parse_scored_endings(rows, today, weekday_int):
         anchor = int(most_recent_last4)
         for num4 in list(scores.keys()):
             if abs(int(num4) - anchor) <= 200:
-                scores[num4] += 1
+                scores[num4] += 1 # Proximity bonus = 1
 
     return scores, most_recent_last4
 
 
-# ── Build Top 30 endings ──────────────────────────────────────────────────────
-def build_top30(scores):
+# ── Build Top 300 endings ──────────────────────────────────────────────────────
+def build_top300(scores):
     """
-    Returns up to 30 best-scored 4-digit endings.
+    Returns up to 300 best-scored 4-digit endings.
     Only uses REAL historical data — no dummy padding.
-    If fewer than 30 real entries exist, returns what we have.
+    If fewer than 300 real entries exist, returns what we have.
     """
-    top = [num for num, _ in scores.most_common(30)]
+    top = [num for num, _ in scores.most_common(300)]
     return top
 
 
 # ── Build 6-Digit VIP numbers ─────────────────────────────────────────────────
-def build_vip(top30):
+def build_vip(top300):
     """
     For each ending X: 6-digit = X[:2] + X (confirmed formula from sample data)
-    e.g.  '4039' → '404039'  →  SB 404039, XC 404039, DF 404039
-    Total = len(top30) × 3 entries.
+    We will just select the top 30 from the list to create VIP numbers (90 total).
     """
     vip = []
-    for ending in top30:
+    for ending in top300[:30]:
         six = ending[:2] + ending
         for series in SERIES:
             vip.append(f"{series} {six}")
@@ -168,17 +186,17 @@ def main():
         print("  [WARN] No historical data available. Cannot generate predictions.")
         return
 
-    top30 = build_top30(scores)
-    vip   = build_vip(top30)
+    top300 = build_top300(scores)
+    vip   = build_vip(top300)
 
-    print(f"  Top 30 endings : {top30}")
+    print(f"  Top 300 endings : {len(top300)} generated")
     print(f"  VIP sample     : {vip[:6]}")
 
     data = {
         "Date":                     date_str,
         "Time":                     "'3:00 PM",   # quote prefix prevents GAS time conversion
         "Day":                      day_str,
-        "4-Digit Endings (Top 30)": ", ".join(top30),
+        "4-Digit Endings":          ", ".join(top300),
         "6-Digit VIP Numbers":      ", ".join(vip),
     }
 
