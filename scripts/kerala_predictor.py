@@ -79,10 +79,10 @@ def parse_scored_endings(rows, today, weekday_int):
             str(row.get("3rd Prize", "") or row.get("third_prize", "")),
             str(row.get("4th Prize", "") or row.get("fourth_prize", "")),
             str(row.get("5th Prize", "") or row.get("fifth_prize", "")),
-            str(row.get("6th Prize", "") or row.get("sixth_prize", "")),
-            str(row.get("7th Prize", "") or row.get("seventh_prize", "")),
-            str(row.get("8th Prize", "") or row.get("eighth_prize", "")),
-            str(row.get("9th Prize", "") or row.get("ninth_prize", "")),
+            str(row.get("6th Prize", "") or row.get("sixth_prize") or row.get("6th_prize", "")),
+            str(row.get("7th Prize", "") or row.get("seventh_prize") or row.get("7th_prize", "")),
+            str(row.get("8th Prize", "") or row.get("eighth_prize") or row.get("8th_prize", "")),
+            str(row.get("9th Prize", "") or row.get("ninth_prize") or row.get("9th_prize", "")),
             str(row.get("Consolidate Prize", "") or row.get("consolidate_prize", ""))
         ])
         
@@ -196,7 +196,7 @@ def main():
         "Date":                     date_str,
         "Time":                     "'3:00 PM",   # quote prefix prevents GAS time conversion
         "Day":                      day_str,
-        "4-Digit Endings":          ", ".join(top300),
+        "4-Digit Endings (Top 300)": ", ".join(top300),
         "6-Digit VIP Numbers":      ", ".join(vip),
     }
 
