@@ -77,28 +77,31 @@ def parse_historical(rows, today, weekday_int):
             continue
 
         age_days = (today - row_date).days
-        # Recency multiplier
-        if age_days <= 7:   rec = 8
-        elif age_days <= 14: rec = 4
-        elif age_days <= 30: rec = 2
-        else:               rec = 1
+        # Recency multiplier (from ML Optimizer)
+        decay = 1.0
+        if age_days <= 7:   decay = 1.5
+        elif age_days > 90: decay = 0.5
 
-        # Day-of-week bonus (0=Mon … 6=Sun)
-        same_day_bonus = 2 if row_date.weekday() == weekday_int else 0
+        # Day-of-week bonus
+        same_day_bonus = 1 if row_date.weekday() == weekday_int else 0
 
-        # All Prizes (2nd to 5th) to gather 4-digit numbers
-        all_prize_text = " ".join([
-            str(row.get("second_prize", "") or row.get("2nd Prize", "")),
-            str(row.get("third_prize", "") or row.get("3rd Prize", "")),
-            str(row.get("fourth_prize", "") or row.get("4th Prize", "")),
-            str(row.get("fifth_prize", "") or row.get("5th Prize", ""))
-        ])
-        nums4 = [n[-4:] for n in re.findall(r'\b\d{4,5}\b', all_prize_text)
-                 if len(n) >= 4 and n not in ('2023', '2024', '2025', '2026', '2027')]
+        # Extract prizes and apply ML weights
+        p1 = str(row.get("first_prize", "") or row.get("1st Prize", ""))[-4:]
+        p2_str = str(row.get("second_prize", "") or row.get("2nd Prize", ""))
+        p3_str = str(row.get("third_prize", "") or row.get("3rd Prize", ""))
+        p4_str = str(row.get("fourth_prize", "") or row.get("4th Prize", ""))
+        p5_str = str(row.get("fifth_prize", "") or row.get("5th Prize", ""))
         
-        for n in nums4:
-            score = rec + same_day_bonus + 1  # +1 frequency base
-            fifth_scored.append((n, score))
+        nums = []
+        if len(p1) == 4: nums.append((p1, 5)) # 1st prize weight = 5
+        nums.extend((x, 3) for x in re.findall(r'\b\d{4}\b', p2_str)) # 2nd prize weight = 3
+        nums.extend((x, 2) for x in re.findall(r'\b\d{4}\b', p3_str)) # 3rd prize weight = 2 (approximate)
+        nums.extend((x, 1.5) for x in re.findall(r'\b\d{4}\b', p4_str)) # 4th prize weight = 1.5
+        nums.extend((x, 1) for x in re.findall(r'\b\d{4}\b', p5_str)) # 5th prize weight = 1
+        
+        for num, base in nums:
+            score = (base * decay) + same_day_bonus
+            fifth_scored.append((num, score))
 
         # 1st Prize — extract leading digit for each last-4
         first = str(row.get("first_prize", "") or row.get("1st Prize", ""))
@@ -107,7 +110,7 @@ def parse_historical(rows, today, weekday_int):
             full5 = m.group(2)          # e.g. "76988"
             last4 = full5[-4:]           # "6988"
             lead  = full5[0]             # "7"
-            first_leading_map[last4][lead] += rec  # weight by recency
+            first_leading_map[last4][lead] += decay  # weight by recency
 
     return fifth_scored, first_leading_map
 
