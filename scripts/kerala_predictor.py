@@ -32,17 +32,18 @@ SERIES     = ["SB", "XC", "DF"]
 HISTORY_DAYS = 180
 
 
-def fetch_gas_tab():
+def fetch_gas_data():
     try:
         url = os.environ.get("GAS_WEBHOOK_URL")
         resp = requests.get(url, timeout=20)
         resp.raise_for_status()
         data = resp.json()
         results = data.get("dynamic_data", {}).get(RESULTS_TAB, [])
-        return results
+        preds = data.get("dynamic_data", {}).get(PRED_TAB, [])
+        return results, preds
     except Exception as e:
         print(f"  [WARN] GAS fetch failed: {e}")
-        return []
+        return [], []
 
 
 # ── Parse and score historical endings ────────────────────────────────────────
@@ -146,6 +147,35 @@ def build_vip(top300):
     return vip
 
 
+# ── Trust Badge Calculation ───────────────────────────────────────────────────
+def calculate_trust_badge(yesterday_pred_str, yesterday_results_dict):
+    clean_pred_str = yesterday_pred_str.replace('"', '').replace(' ', '')
+    if not clean_pred_str:
+        return "0", ""
+    
+    predicted_4_digits = set(clean_pred_str.split(","))
+    
+    all_prizes = " ".join([
+        str(yesterday_results_dict.get("first_prize", "") or yesterday_results_dict.get("1st Prize", "")),
+        str(yesterday_results_dict.get("second_prize", "") or yesterday_results_dict.get("2nd Prize", "")),
+        str(yesterday_results_dict.get("third_prize", "") or yesterday_results_dict.get("3rd Prize", "")),
+        str(yesterday_results_dict.get("fourth_prize", "") or yesterday_results_dict.get("4th Prize", "")),
+        str(yesterday_results_dict.get("fifth_prize", "") or yesterday_results_dict.get("5th Prize", "")),
+        str(yesterday_results_dict.get("sixth_prize", "") or yesterday_results_dict.get("6th_prize", "") or yesterday_results_dict.get("6th Prize", "")),
+        str(yesterday_results_dict.get("seventh_prize", "") or yesterday_results_dict.get("7th_prize", "") or yesterday_results_dict.get("7th Prize", "")),
+        str(yesterday_results_dict.get("eighth_prize", "") or yesterday_results_dict.get("8th_prize", "") or yesterday_results_dict.get("8th Prize", "")),
+        str(yesterday_results_dict.get("ninth_prize", "") or yesterday_results_dict.get("9th_prize", "") or yesterday_results_dict.get("9th Prize", "")),
+        str(yesterday_results_dict.get("consolidate_prize", "") or yesterday_results_dict.get("Consolidate Prize", ""))
+    ])
+    
+    winning_numbers = set([n[-4:] for n in re.findall(r'\b\d{4,6}\b', all_prizes) if len(n) >= 4])
+    matched = predicted_4_digits.intersection(winning_numbers)
+    
+    if len(matched) == 0:
+        return "0", ""
+    return str(len(matched)), ", ".join(list(matched))
+
+
 # ── Send to GAS ───────────────────────────────────────────────────────────────
 def send_to_gas(data_dict):
     """Sends the prediction data to the GAS webhook."""
@@ -175,8 +205,20 @@ def main():
 
     print(f"\n[KERALA PREDICTOR v2] {date_str} ({day_str})  |  History: {HISTORY_DAYS} days")
 
-    rows = fetch_gas_tab()
-    print(f"  Rows fetched: {len(rows)}")
+    rows, preds = fetch_gas_data()
+    print(f"  Rows fetched: {len(rows)} | Preds fetched: {len(preds)}")
+
+    # Trust Badge Logic
+    yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday_pred_row = next((r for r in preds if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
+    yesterday_result_row = next((r for r in rows if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
+    
+    trust_count = "0"
+    trust_matched = ""
+    if yesterday_pred_row and yesterday_result_row:
+        pred_4_str = str(yesterday_pred_row.get("4-Digit Endings (Top 300)", "") or yesterday_pred_row.get("4_digit_endings_top_300", "") or yesterday_pred_row.get("4-Digit Endings", ""))
+        trust_count, trust_matched = calculate_trust_badge(pred_4_str, yesterday_result_row)
+        print(f"  Trust Badge: {trust_count} matched from yesterday")
 
     scores, most_recent = parse_scored_endings(rows, today, weekday_int)
     print(f"  Unique endings scored: {len(scores)}")
@@ -198,6 +240,8 @@ def main():
         "Day":                      day_str,
         "4-Digit Endings (Top 300)": ", ".join(top300),
         "6-Digit VIP Numbers":      ", ".join(vip),
+        "Yesterday Matches":        trust_count,
+        "Yesterday Matched Numbers": trust_matched,
     }
 
     send_to_gas(data)
