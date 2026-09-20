@@ -36,18 +36,22 @@ DRAWS = [
 ]
 
 
-def fetch_gas_tab(draw_time):
-    """Returns list of row dicts from GAS results."""
+def fetch_gas_data(draw_time, pred_tab):
+    """Returns (results_rows, prediction_rows) from GAS."""
     try:
         url = os.environ.get("GAS_WEBHOOK_URL")
         resp = requests.get(url, timeout=20)
         resp.raise_for_status()
         data = resp.json()
-        results = data.get("dynamic_data", {}).get(f"Results {draw_time}", [])
-        return [row for row in results if row.get("time") == draw_time or row.get("Time") == draw_time]
+        
+        all_results = data.get("dynamic_data", {}).get(f"Results {draw_time}", [])
+        results = [row for row in all_results if row.get("time") == draw_time or row.get("Time") == draw_time]
+        
+        preds = data.get("dynamic_data", {}).get(pred_tab, [])
+        return results, preds
     except Exception as e:
         print(f"  [WARN] GAS fetch failed: {e}")
-        return []
+        return [], []
 
 
 # ── Parse historical rows into scored records ──────────────────────────────────
@@ -121,6 +125,30 @@ def parse_historical(rows, today, weekday_int):
                 most_recent_last4 = last4
 
     return fifth_scored, first_leading_map, most_recent_last4
+
+
+# ── Trust Badge Calculation ───────────────────────────────────────────────────
+def calculate_trust_badge(yesterday_pred_str, yesterday_results_dict):
+    clean_pred_str = yesterday_pred_str.replace('"', '').replace(' ', '')
+    if not clean_pred_str:
+        return "0", ""
+    
+    predicted_4_digits = set(clean_pred_str.split(","))
+    
+    all_prizes = " ".join([
+        str(yesterday_results_dict.get("first_prize", "") or yesterday_results_dict.get("1st Prize", "")),
+        str(yesterday_results_dict.get("second_prize", "") or yesterday_results_dict.get("2nd Prize", "")),
+        str(yesterday_results_dict.get("third_prize", "") or yesterday_results_dict.get("3rd Prize", "")),
+        str(yesterday_results_dict.get("fourth_prize", "") or yesterday_results_dict.get("4th Prize", "")),
+        str(yesterday_results_dict.get("fifth_prize", "") or yesterday_results_dict.get("5th Prize", ""))
+    ])
+    
+    winning_numbers = set([n[-4:] for n in re.findall(r'\b\d{4,6}\b', all_prizes) if len(n) >= 4])
+    matched = predicted_4_digits.intersection(winning_numbers)
+    
+    if len(matched) == 0:
+        return "0", ""
+    return str(len(matched)), ", ".join(list(matched))
 
 
 # ── Build 4-digit prediction list (300 total) ─────────────────────────────────
@@ -275,12 +303,24 @@ def main():
         results_tab = f"Results {draw['time']}"
         pred_tab    = draw["tab"]
 
-        print(f"\n[DEAR PREDICTOR v2] {draw['time']} — {date_str} ({day_str})")
+        print(f"\n[DEAR PREDICTOR v2] {draw['time']} - {date_str} ({day_str})")
         print(f"\n[DEAR PREDICTOR v2] {date_str} ({day_str})  |  History: {HISTORY_DAYS} days")
 
-        # Now fetch_gas_tab uses the time string, e.g. "1:00 PM"
-        rows = fetch_gas_tab(draw["time"])
-        print(f"  Rows fetched: {len(rows)}")
+        # Now fetch_gas_data returns both results and predictions for this draw time
+        rows, preds = fetch_gas_data(draw["time"], pred_tab)
+        print(f"  Rows fetched: {len(rows)} | Preds fetched: {len(preds)}")
+
+        # Trust Badge Logic
+        yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+        yesterday_pred_row = next((r for r in preds if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
+        yesterday_result_row = next((r for r in rows if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
+        
+        trust_count = "0"
+        trust_matched = ""
+        if yesterday_pred_row and yesterday_result_row:
+            pred_4_str = str(yesterday_pred_row.get("4 Digit Prediction", "") or yesterday_pred_row.get("4_digit_prediction", ""))
+            trust_count, trust_matched = calculate_trust_badge(pred_4_str, yesterday_result_row)
+            print(f"  Trust Badge: {trust_count} matched from yesterday")
 
         fifth_scored, first_leading_map, most_recent = parse_historical(rows, today, weekday_int)
         print(f"  5th-prize data points: {len(fifth_scored)}")
@@ -307,11 +347,12 @@ def main():
             "5 Digit Prediction":    fmt(five_pred),
             "4 Digit Prediction":    fmt(four_pred),
             "SUPER VIP PREDICTION":  fmt(super_vip),
+            "Yesterday Matches":     trust_count,
+            "Yesterday Matched Numbers": trust_matched,
         }
 
         send_to_gas(pred_tab, data)
         print(f"  [DONE] -> '{pred_tab}'")
-
 
 if __name__ == "__main__":
     main()
