@@ -133,7 +133,7 @@ def calculate_trust_badge(yesterday_pred_str, yesterday_results_dict):
     if not clean_pred_str:
         return ""
     
-    predicted_4_digits = set(clean_pred_str.split(","))
+    predicted_4_digits = set([p[-4:] for p in clean_pred_str.split(",") if len(p) >= 4])
     
     prize_keys = [
         ("1st Prize", ["first_prize", "1st Prize"]),
@@ -348,7 +348,11 @@ def main():
         trust_matched = ""
         if yesterday_pred_row and yesterday_result_row:
             pred_4_str = str(yesterday_pred_row.get("4 Digit Prediction", "") or yesterday_pred_row.get("4_digit_prediction", ""))
-            trust_matched = calculate_trust_badge(pred_4_str, yesterday_result_row)
+            pred_5_str = str(yesterday_pred_row.get("5 Digit Prediction", "") or yesterday_pred_row.get("5_digit_prediction", ""))
+            super_vip_str = str(yesterday_pred_row.get("SUPER VIP PREDICTION", "") or yesterday_pred_row.get("super_vip_prediction", ""))
+            
+            all_preds = f"{pred_4_str},{pred_5_str},{super_vip_str}"
+            trust_matched = calculate_trust_badge(all_preds, yesterday_result_row)
             print(f"  Trust Badge evaluated for yesterday")
 
         fifth_scored, first_leading_map, most_recent = parse_historical(rows, today, weekday_int)
