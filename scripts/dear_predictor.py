@@ -266,12 +266,29 @@ def send_to_gas(tab_name, data_dict):
         url = os.environ.get("GAS_WEBHOOK_URL")
         resp = requests.post(url, json=payload,
                              headers={"Content-Type": "application/json"}, timeout=20)
-        print(f"  GAS: {resp.status_code} — {resp.text[:120]}")
+        print(f"  GAS (insert): {resp.status_code} - {resp.text[:120]}")
     except Exception as e:
         print(f"  [ERROR] {e}")
 
+def send_update_trust_to_gas(tab_name, target_date, matches_count, matched_numbers):
+    """Sends a request to update the trust badge data for a specific past date."""
+    payload = {
+        "action": "update_trust",
+        "tab_name": tab_name,
+        "target_date": target_date,
+        "trust_matches": matches_count,
+        "trust_matched_numbers": matched_numbers
+    }
+    try:
+        url = os.environ.get("GAS_WEBHOOK_URL")
+        resp = requests.post(url, json=payload,
+                             headers={"Content-Type": "application/json"}, timeout=20)
+        print(f"  GAS (update_trust {target_date}): {resp.status_code} - {resp.text[:120]}")
+    except Exception as e:
+        print(f"  [ERROR updating trust] {e}")
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+
+# 🎯 Main 🎯──────────────────────────────────────────────────────────────────────
 def main():
     url = os.environ.get("GAS_WEBHOOK_URL")
     if not url:
@@ -347,10 +364,13 @@ def main():
             "5 Digit Prediction":    fmt(five_pred),
             "4 Digit Prediction":    fmt(four_pred),
             "SUPER VIP PREDICTION":  fmt(super_vip),
-            "Yesterday Matches":     trust_count,
-            "Yesterday Matched Numbers": trust_matched,
         }
 
+        # 1. Update Yesterday's Trust Badge (if found)
+        if yesterday_pred_row and yesterday_result_row:
+            send_update_trust_to_gas(pred_tab, yesterday_str, trust_count, trust_matched)
+            
+        # 2. Insert Today's Prediction
         send_to_gas(pred_tab, data)
         print(f"  [DONE] -> '{pred_tab}'")
 
