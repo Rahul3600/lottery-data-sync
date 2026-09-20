@@ -186,9 +186,29 @@ def send_to_gas(data_dict):
         req.add_header("Content-Type", "application/json")
         body = json.dumps(payload).encode("utf-8")
         with urllib.request.urlopen(req, data=body) as f:
-            print(f"  GAS: {f.read().decode('utf-8')[:120]}")
+            print(f"  GAS (insert): {f.read().decode('utf-8')[:120]}")
     except Exception as e:
         print(f"  [ERROR] {e}")
+
+
+def send_update_trust_to_gas(tab_name, target_date, matches_count, matched_numbers):
+    """Sends a request to update the trust badge data for a specific past date."""
+    payload = {
+        "action": "update_trust",
+        "tab_name": tab_name,
+        "target_date": target_date,
+        "trust_matches": matches_count,
+        "trust_matched_numbers": matched_numbers
+    }
+    try:
+        url = os.environ.get("GAS_WEBHOOK_URL")
+        req = urllib.request.Request(url, method="POST")
+        req.add_header("Content-Type", "application/json")
+        body = json.dumps(payload).encode("utf-8")
+        with urllib.request.urlopen(req, data=body) as f:
+            print(f"  GAS (update_trust {target_date}): {f.read().decode('utf-8')[:120]}")
+    except Exception as e:
+        print(f"  [ERROR updating trust] {e}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -240,12 +260,15 @@ def main():
         "Day":                      day_str,
         "4-Digit Endings (Top 300)": ", ".join(top300),
         "6-Digit VIP Numbers":      ", ".join(vip),
-        "Yesterday Matches":        trust_count,
-        "Yesterday Matched Numbers": trust_matched,
     }
 
+    # 1. Update Yesterday's Trust Badge (if found)
+    if yesterday_pred_row and yesterday_result_row:
+        send_update_trust_to_gas(PRED_TAB, yesterday_str, trust_count, trust_matched)
+        
+    # 2. Insert Today's Prediction
     send_to_gas(data)
-    print(f"  [DONE] → '{PRED_TAB}'")
+    print(f"  [DONE]   '{PRED_TAB}'")
 
 
 if __name__ == "__main__":
