@@ -179,7 +179,7 @@ def calculate_trust_badge(yesterday_pred_str, yesterday_results_dict):
                 break
         
         if prize_val:
-            winning_numbers = set([n[-4:] for n in re.findall(r'\b\d{4,6}\b', prize_val) if len(n) >= 4])
+            winning_numbers = set([n[-4:] for n in re.findall(r'\d{4,}', prize_val) if len(n) >= 4])
             matched = predicted_4_digits.intersection(winning_numbers)
             if matched:
                 matched_details.append(f"{label}: " + ", ".join(list(matched)))
@@ -248,8 +248,8 @@ def main():
     
     trust_matched = ""
     if yesterday_pred_row and yesterday_result_row:
-        pred_4_str = str(yesterday_pred_row.get("4-Digit Endings (Top 300)", "") or yesterday_pred_row.get("4_digit_endings_top_300", "") or yesterday_pred_row.get("4-Digit Endings", ""))
-        vip_6_str = str(yesterday_pred_row.get("6-Digit VIP Numbers", "") or yesterday_pred_row.get("6_digit_vip_numbers", ""))
+        pred_4_str = str(yesterday_pred_row.get("4-Digit Endings (Top 300)", "") or yesterday_pred_row.get("4-digit_endings_(top_300)", "") or yesterday_pred_row.get("4_digit_endings_top_300", "") or yesterday_pred_row.get("4-Digit Endings", ""))
+        vip_6_str = str(yesterday_pred_row.get("6-Digit VIP Numbers", "") or yesterday_pred_row.get("6-digit_vip_numbers", "") or yesterday_pred_row.get("6_digit_vip_numbers", ""))
         
         all_preds = f"{pred_4_str},{vip_6_str}"
         trust_matched = calculate_trust_badge(all_preds, yesterday_result_row)
