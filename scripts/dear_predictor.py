@@ -154,7 +154,7 @@ def calculate_trust_badge(yesterday_pred_str, yesterday_results_dict):
                 break
         
         if prize_val:
-            winning_numbers = set([n[-4:] for n in re.findall(r'\b\d{4,6}\b', prize_val) if len(n) >= 4])
+            winning_numbers = set([n[-4:] for n in re.findall(r'\d{4,}', prize_val) if len(n) >= 4])
             matched = predicted_4_digits.intersection(winning_numbers)
             if matched:
                 matched_details.append(f"{label}: " + ", ".join(list(matched)))
