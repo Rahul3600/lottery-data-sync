@@ -151,29 +151,43 @@ def build_vip(top300):
 def calculate_trust_badge(yesterday_pred_str, yesterday_results_dict):
     clean_pred_str = yesterday_pred_str.replace('"', '').replace(' ', '')
     if not clean_pred_str:
-        return "0", ""
+        return ""
     
     predicted_4_digits = set(clean_pred_str.split(","))
     
-    all_prizes = " ".join([
-        str(yesterday_results_dict.get("first_prize", "") or yesterday_results_dict.get("1st Prize", "")),
-        str(yesterday_results_dict.get("second_prize", "") or yesterday_results_dict.get("2nd Prize", "")),
-        str(yesterday_results_dict.get("third_prize", "") or yesterday_results_dict.get("3rd Prize", "")),
-        str(yesterday_results_dict.get("fourth_prize", "") or yesterday_results_dict.get("4th Prize", "")),
-        str(yesterday_results_dict.get("fifth_prize", "") or yesterday_results_dict.get("5th Prize", "")),
-        str(yesterday_results_dict.get("sixth_prize", "") or yesterday_results_dict.get("6th_prize", "") or yesterday_results_dict.get("6th Prize", "")),
-        str(yesterday_results_dict.get("seventh_prize", "") or yesterday_results_dict.get("7th_prize", "") or yesterday_results_dict.get("7th Prize", "")),
-        str(yesterday_results_dict.get("eighth_prize", "") or yesterday_results_dict.get("8th_prize", "") or yesterday_results_dict.get("8th Prize", "")),
-        str(yesterday_results_dict.get("ninth_prize", "") or yesterday_results_dict.get("9th_prize", "") or yesterday_results_dict.get("9th Prize", "")),
-        str(yesterday_results_dict.get("consolidate_prize", "") or yesterday_results_dict.get("Consolidate Prize", ""))
-    ])
+    prize_keys = [
+        ("1st Prize", ["first_prize", "1st Prize"]),
+        ("2nd Prize", ["second_prize", "2nd Prize"]),
+        ("3rd Prize", ["third_prize", "3rd Prize"]),
+        ("4th Prize", ["fourth_prize", "4th Prize"]),
+        ("5th Prize", ["fifth_prize", "5th Prize"]),
+        ("6th Prize", ["sixth_prize", "6th_prize", "6th Prize"]),
+        ("7th Prize", ["seventh_prize", "7th_prize", "7th Prize"]),
+        ("8th Prize", ["eighth_prize", "8th_prize", "8th Prize"]),
+        ("9th Prize", ["ninth_prize", "9th_prize", "9th Prize"]),
+        ("Cons Prize", ["consolidate_prize", "Consolidate Prize"])
+    ]
     
-    winning_numbers = set([n[-4:] for n in re.findall(r'\b\d{4,6}\b', all_prizes) if len(n) >= 4])
-    matched = predicted_4_digits.intersection(winning_numbers)
+    matched_details = []
     
-    if len(matched) == 0:
-        return "0", ""
-    return str(len(matched)), ", ".join(list(matched))
+    for label, keys in prize_keys:
+        prize_val = ""
+        for k in keys:
+            val = str(yesterday_results_dict.get(k, ""))
+            if val:
+                prize_val = val
+                break
+        
+        if prize_val:
+            winning_numbers = set([n[-4:] for n in re.findall(r'\b\d{4,6}\b', prize_val) if len(n) >= 4])
+            matched = predicted_4_digits.intersection(winning_numbers)
+            if matched:
+                matched_details.append(f"{label}: " + ", ".join(list(matched)))
+                
+    if not matched_details:
+        return ""
+        
+    return " | ".join(matched_details)
 
 
 # ── Send to GAS ───────────────────────────────────────────────────────────────
@@ -191,13 +205,12 @@ def send_to_gas(data_dict):
         print(f"  [ERROR] {e}")
 
 
-def send_update_trust_to_gas(tab_name, target_date, matches_count, matched_numbers):
+def send_update_trust_to_gas(tab_name, target_date, matched_numbers):
     """Sends a request to update the trust badge data for a specific past date."""
     payload = {
         "action": "update_trust",
         "tab_name": tab_name,
         "target_date": target_date,
-        "trust_matches": matches_count,
         "trust_matched_numbers": matched_numbers
     }
     try:
@@ -233,12 +246,11 @@ def main():
     yesterday_pred_row = next((r for r in preds if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
     yesterday_result_row = next((r for r in rows if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
     
-    trust_count = "0"
     trust_matched = ""
     if yesterday_pred_row and yesterday_result_row:
         pred_4_str = str(yesterday_pred_row.get("4-Digit Endings (Top 300)", "") or yesterday_pred_row.get("4_digit_endings_top_300", "") or yesterday_pred_row.get("4-Digit Endings", ""))
-        trust_count, trust_matched = calculate_trust_badge(pred_4_str, yesterday_result_row)
-        print(f"  Trust Badge: {trust_count} matched from yesterday")
+        trust_matched = calculate_trust_badge(pred_4_str, yesterday_result_row)
+        print(f"  Trust Badge evaluated for yesterday")
 
     scores, most_recent = parse_scored_endings(rows, today, weekday_int)
     print(f"  Unique endings scored: {len(scores)}")
@@ -260,11 +272,12 @@ def main():
         "Day":                      day_str,
         "4-Digit Endings (Top 300)": ", ".join(top300),
         "6-Digit VIP Numbers":      ", ".join(vip),
+        "Trust Matched Numbers":    ""  # Ensures column is auto-created by GAS
     }
 
     # 1. Update Yesterday's Trust Badge (if found)
     if yesterday_pred_row and yesterday_result_row:
-        send_update_trust_to_gas(PRED_TAB, yesterday_str, trust_count, trust_matched)
+        send_update_trust_to_gas(PRED_TAB, yesterday_str, trust_matched)
         
     # 2. Insert Today's Prediction
     send_to_gas(data)
