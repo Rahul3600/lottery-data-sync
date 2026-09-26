@@ -262,9 +262,6 @@ def build_super_vip(five_pred, group_scores_flat):
     return [x[0] for x in scored[:15]]
 
 
-# ── Middle Matrix (constant) ──────────────────────────────────────────────────
-def build_middle_matrix():
-    return ", ".join([f'"{i:02d}"' for i in range(100)])
 
 
 # ── Format list as quoted CSV ─────────────────────────────────────────────────
@@ -366,7 +363,6 @@ def main():
         four_pred = build_four_digit_predictions(fifth_scored, most_recent)
         five_pred = build_five_digit_predictions(four_pred, first_leading_map)
         super_vip = build_super_vip(five_pred, score_flat)
-        matrix    = build_middle_matrix()
 
         print(f"  4-Digit count : {len(four_pred)}")
         print(f"  5-Digit count : {len(five_pred)}")
@@ -376,7 +372,6 @@ def main():
             "Date":                  date_str,
             "Time":                  f"'{draw['time']}",  # Single quote prevents 24h format conversion
             "Day":                   day_str,
-            "Middle Matrix":         matrix,
             "5 Digit Prediction":    fmt(five_pred),
             "4 Digit Prediction":    fmt(four_pred),
             "SUPER VIP PREDICTION":  fmt(super_vip),
