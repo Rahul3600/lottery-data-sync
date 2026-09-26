@@ -45,10 +45,9 @@ def fetch_gas_data(draw_time, pred_tab):
         data = resp.json()
         
         all_results = data.get("dynamic_data", {}).get(f"Results {draw_time}", [])
-        results = [row for row in all_results if row.get("time") == draw_time or row.get("Time") == draw_time]
         
         preds = data.get("dynamic_data", {}).get(pred_tab, [])
-        return results, preds
+        return all_results, preds
     except Exception as e:
         print(f"  [WARN] GAS fetch failed: {e}")
         return [], []
