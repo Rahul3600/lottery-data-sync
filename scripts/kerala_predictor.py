@@ -182,7 +182,8 @@ def calculate_trust_badge(yesterday_pred_str, yesterday_results_dict):
             winning_numbers = set([n[-4:] for n in re.findall(r'\d{4,}', prize_val) if len(n) >= 4])
             matched = predicted_4_digits.intersection(winning_numbers)
             if matched:
-                matched_details.append(f"{label}: " + ", ".join(list(matched)))
+                matched_sorted = sorted(list(matched), key=lambda x: int(x) if x.isdigit() else x)
+                matched_details.append(f"{label}: " + ", ".join(matched_sorted))
                 
     if not matched_details:
         return ""
@@ -265,6 +266,9 @@ def main():
 
     top300 = build_top300(scores)
     vip   = build_vip(top300)
+
+    top300.sort(key=lambda x: int(x) if x.isdigit() else x)
+    vip.sort(key=lambda x: int(x) if x.isdigit() else x)
 
     print(f"  Top 300 endings : {len(top300)} generated")
     print(f"  VIP sample     : {vip[:6]}")
