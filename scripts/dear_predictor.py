@@ -369,12 +369,12 @@ def main():
 
         data = {
             "Date":                  date_str,
-            "Time":                  f"'{draw['time']}",  # Single quote prevents 24h format conversion
+            "Time":                  f"'{draw['time']}",
             "Day":                   day_str,
             "5 Digit Prediction":    fmt(five_pred),
             "4 Digit Prediction":    fmt(four_pred),
             "SUPER VIP PREDICTION":  fmt(super_vip),
-            "Trust Matched Numbers": ""  # Ensures column is auto-created by GAS
+            "Trust Matched Numbers": "" 
         }
 
         # 1. Update Yesterday's Trust Badge (if found)
