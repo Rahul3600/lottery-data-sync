@@ -188,6 +188,16 @@ def main():
     
     ist = timezone(timedelta(hours=5, minutes=30))
     today_date = datetime.now(ist)
+    current_hour = today_date.hour
+
+    event_name = os.environ.get("EVENT_NAME", "workflow_dispatch")
+    schedule_cron = os.environ.get("SCHEDULE_CRON", "")
+
+    # If the job was scheduled for today but got delayed in the GitHub Actions queue past midnight,
+    # the hour will be early morning (e.g., 0-7 AM). No draws happen then, so it MUST be a delayed run for yesterday!
+    if current_hour < 8 and event_name == "schedule" and schedule_cron:
+        print(f"Delayed cron detected at {current_hour}:00 IST! Shifting date to yesterday.")
+        today_date = today_date - timedelta(days=1)
     
     # Save into Google Sheets as the REAL current date (e.g. 2026)
     date_str_sheets = today_date.strftime("%Y-%m-%d")
@@ -199,10 +209,6 @@ def main():
         {"time": "6:00 PM", "name": "DEAR DAY",     "url_part": "6pm", "hour": 18},
         {"time": "8:00 PM", "name": "DEAR NIGHT",   "url_part": "8pm", "hour": 20}
     ]
-
-    current_hour = today_date.hour
-    event_name = os.environ.get("EVENT_NAME", "workflow_dispatch")
-    schedule_cron = os.environ.get("SCHEDULE_CRON", "")
 
     target_draws = []
 
@@ -218,10 +224,17 @@ def main():
         # Fallback for manual trigger: process ALL draws that should have occurred by now
         valid_draws = [d for d in draws if d["hour"] <= current_hour]
         if not valid_draws:
-            print(f"No draws have occurred yet at current hour {current_hour}:00 IST. Nothing to process.")
-            return
-        target_draws = valid_draws
-        print(f"Manual Run: Processing {len(target_draws)} draws...")
+            print(f"No draws have occurred yet at current hour {current_hour}:00 IST.")
+            print("Fallback: Processing ALL draws for YESTERDAY.")
+            # Set today to yesterday!
+            today_date = today_date - timedelta(days=1)
+            date_str_sheets = today_date.strftime("%Y-%m-%d")
+            date_str_url = today_date.strftime("%d-%m-%Y")
+            day_str = today_date.strftime("%A").upper()
+            target_draws = draws
+        else:
+            target_draws = valid_draws
+            print(f"Manual Run: Processing {len(target_draws)} draws...")
 
     for draw in draws:
         if draw not in target_draws:
