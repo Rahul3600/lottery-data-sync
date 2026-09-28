@@ -156,7 +156,8 @@ def calculate_trust_badge(yesterday_pred_str, yesterday_results_dict):
             winning_numbers = set([n[-4:] for n in re.findall(r'\d{4,}', prize_val) if len(n) >= 4])
             matched = predicted_4_digits.intersection(winning_numbers)
             if matched:
-                matched_details.append(f"{label}: " + ", ".join(list(matched)))
+                matched_sorted = sorted(list(matched), key=lambda x: int(x) if x.isdigit() else x)
+                matched_details.append(f"{label}: " + ", ".join(matched_sorted))
                 
     if not matched_details:
         return ""
@@ -362,6 +363,10 @@ def main():
         four_pred = build_four_digit_predictions(fifth_scored, most_recent)
         five_pred = build_five_digit_predictions(four_pred, first_leading_map)
         super_vip = build_super_vip(five_pred, score_flat)
+
+        four_pred.sort(key=lambda x: int(x) if x.isdigit() else x)
+        five_pred.sort(key=lambda x: int(x) if x.isdigit() else x)
+        super_vip.sort(key=lambda x: int(x) if x.isdigit() else x)
 
         print(f"  4-Digit count : {len(four_pred)}")
         print(f"  5-Digit count : {len(five_pred)}")
