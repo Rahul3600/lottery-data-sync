@@ -195,7 +195,7 @@ def main():
 
     # If the job was scheduled for today but got delayed in the GitHub Actions queue past midnight,
     # the hour will be early morning (e.g., 0-7 AM). No draws happen then, so it MUST be a delayed run for yesterday!
-    if current_hour < 8 and event_name == "schedule" and schedule_cron:
+    if current_hour < 8:
         print(f"Delayed cron detected at {current_hour}:00 IST! Shifting date to yesterday.")
         today_date = today_date - timedelta(days=1)
     
