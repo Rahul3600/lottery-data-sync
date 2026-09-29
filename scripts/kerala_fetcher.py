@@ -10,6 +10,12 @@ import requests
 def get_kerala_draw_info():
     ist = pytz.timezone('Asia/Kolkata')
     today = datetime.now(ist)
+    
+    # Fallback: if running between midnight and 8 AM, check for yesterday's draw instead
+    if today.hour < 8:
+        from datetime import timedelta
+        today = today - timedelta(days=1)
+        
     date_str = today.strftime("%Y-%m-%d")
     day_str = today.strftime("%A").upper()
     target_date = today.strftime("%d/%m/%Y")
