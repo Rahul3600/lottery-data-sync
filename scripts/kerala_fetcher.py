@@ -6,6 +6,8 @@ import pytz
 import fitz  # PyMuPDF
 import re
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def get_kerala_draw_info():
     ist = pytz.timezone('Asia/Kolkata')
@@ -23,14 +25,47 @@ def get_kerala_draw_info():
     # Scrape the official Kerala lottery site for today's draw
     try:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-        html = requests.get('https://www.lotteryagent.kerala.gov.in/result/public/', headers=headers, timeout=20).text
+        html = requests.get('https://www.lotteryagent.kerala.gov.in/result/public/', headers=headers, timeout=20, verify=False).text
         
         # Format in table:
         # <td>1</td> <td>SUVARNA KERALAM-10/11/2025 (SK-75)</td> <td>30-10-2026</td> ... data-item-id="uuid"
         pattern = r'<td>\s*(\d+)\s*</td>\s*<td>\s*([^<]+)\s*</td>\s*<td>\s*' + re.escape(target_date) + r'\s*</td>.*?data-item-id="([^"]+)"'
         match = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
         
-        # If today's draw is not uploaded yet, fallback to yesterday's draw if running manual/delayed
+        # If today's draw is not found on Official Portal, try Backup Portal (result.keralalotteries.com)
+        if not match:
+            print("Today's draw not found on Official Government Portal, checking Backup Portal (result.keralalotteries.com)...")
+            target_date_slash = today.strftime("%d/%m/%Y")
+            try:
+                html_backup = requests.get('https://result.keralalotteries.com/', headers=headers, timeout=15, verify=False).text
+                match_backup = re.search(
+                    r'<td[^>]*>\s*([A-Za-z\-\s]+)\s*\(\s*([^)]+)\s*\)\s*</td>\s*<td[^>]*>\s*' +
+                    re.escape(target_date_slash) +
+                    r'\s*</td>\s*<td[^>]*>.*?drawserial=(\d+)',
+                    html_backup, re.DOTALL | re.IGNORECASE
+                )
+                if match_backup:
+                    lottery_name = match_backup.group(1).strip().replace("-", " ")
+                    draw_no = match_backup.group(2).strip()
+                    m_num = re.search(r'(\d+)$', draw_no)
+                    if m_num:
+                        n = int(m_num.group(1))
+                        suf = "th" if 11 <= (n % 100) <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+                        draw_no += suf
+                    draw_serial = match_backup.group(3).strip()
+                    print(f"Found on Backup Portal: {lottery_name} ({draw_no})")
+                    return {
+                        "item_id": draw_serial,
+                        "pdf_url": f"https://result.keralalotteries.com/viewlotisresult.php?drawserial={draw_serial}",
+                        "date_str": date_str,
+                        "day_str": day_str,
+                        "lottery_name": lottery_name,
+                        "draw_no": draw_no
+                    }
+            except Exception as ex_b:
+                print(f"Backup portal check skipped: {ex_b}")
+
+        # If today's draw is not uploaded yet on either, fallback to yesterday's draw if running manual/delayed
         if not match:
             from datetime import timedelta
             yesterday = today - timedelta(days=1)
@@ -103,7 +138,7 @@ def main():
 
     try:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-        response = requests.get(pdf_url, headers=headers, timeout=30)
+        response = requests.get(pdf_url, headers=headers, timeout=30, verify=False)
         if response.status_code != 200 or 'application/pdf' not in response.headers.get('Content-Type', ''):
             print(f"Failed to fetch PDF. Status: {response.status_code}. Content-Type: {response.headers.get('Content-Type', '')}")
             return
