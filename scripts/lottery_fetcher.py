@@ -1,6 +1,8 @@
 import os
 import json
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from datetime import datetime
 
 import io
@@ -31,6 +33,18 @@ def send_to_gas(tab_name, data_dict):
     except Exception as e:
         print(f"Error sending data to GAS: {e}")
 
+
+def fetch_rf_hashes():
+    """Fetch dynamic filename hashes from lottery.sambad.com."""
+    try:
+        r = requests.get('https://lottery.sambad.com/', headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}, timeout=10, verify=False)
+        m = re.search(r'var rfHash\s*=\s*(\{.*?\});', r.text)
+        if m:
+            return json.loads(m.group(1))
+    except Exception as e:
+        print(f"Warning: Could not fetch rfHash: {e}")
+    return {}
+
 def process_lottery_image(url):
     """
     Downloads the PDF and extracts prize data using PyMuPDF's native text extraction.
@@ -47,8 +61,8 @@ def process_lottery_image(url):
     Returns a dict with prizes or None if the PDF is not available yet.
     """
     try:
-        response = requests.get(url, stream=True, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-        if response.status_code != 200:
+        response = requests.get(url, stream=True, timeout=15, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}, verify=False)
+        if response.status_code != 200 or response.content[:4] != b"%PDF":
             print(f"File not available yet (HTTP {response.status_code}): {url}")
             return None
             
@@ -108,7 +122,7 @@ def process_lottery_image(url):
             if re.search(r'\b\d{5}\b', line):
                 continue
             # Skip noisy text lines (TDS notice, dates with slashes, etc.)
-            if '/' in line or any(word in line.upper() for word in ['TDS', 'PRIZE', 'AMOUNT', 'DEDUCTED', 'SELLER', 'SOLD', 'SECTION', 'ACT', 'LOTTERY', 'WEEKLY', 'SPARK', 'DEAR', 'W.E.F']):
+            if '/' in line or any(word in line.upper() for word in ['TDS', 'PRIZE', 'AMOUNT', 'DEDUCTED', 'SELLER', 'SOLD', 'SECTION', 'ACT', 'LOTTERY', 'WEEKLY', 'SPARK', 'DEAR', 'SHINE', 'STAR', 'RISE', 'WISH', 'VISION', 'VICTORY', 'W.E.F']):
                 continue
             
             nums = re.findall(r'\b\d{4}\b', line)
@@ -205,10 +219,11 @@ def main():
     day_str = today_date.strftime("%A").upper()
 
     draws = [
-        {"time": "1:00 PM", "name": "DEAR MORNING", "url_part": "1pm", "hour": 13},
-        {"time": "6:00 PM", "name": "DEAR DAY",     "url_part": "6pm", "hour": 18},
-        {"time": "8:00 PM", "name": "DEAR NIGHT",   "url_part": "8pm", "hour": 20}
+        {"time": "1:00 PM", "name": "DEAR MORNING", "url_part": "1pm", "pfx": "MN", "hour": 13},
+        {"time": "6:00 PM", "name": "DEAR DAY",     "url_part": "6pm", "pfx": "DN", "hour": 18},
+        {"time": "8:00 PM", "name": "DEAR NIGHT",   "url_part": "8pm", "pfx": "EN", "hour": 20}
     ]
+    rf_hashes = fetch_rf_hashes()
 
     target_draws = []
 
@@ -236,14 +251,29 @@ def main():
             target_draws = valid_draws
             print(f"Manual Run: Processing {len(target_draws)} draws...")
 
+    date_str_short = today_date.strftime("%d%m%y")
     for draw in draws:
         if draw not in target_draws:
             print(f"Skipping {draw['time']}: Not targeted for this run.")
             continue
 
-        url = f"https://lottery.sambad.com/pdf/lottery-sambad-{draw['url_part']}-{date_str_url}.pdf"
+        slot = draw["url_part"]
+        pfx = draw["pfx"]
+        h = rf_hashes.get(date_str_url, {}).get(slot)
+        hash_suffix = f"-{h}" if h else ""
         
-        ocr_prizes = process_lottery_image(url)
+        # 1. Primary: Official Sambad portal with dynamic hash
+        primary_url = f"https://lottery.sambad.com/pdf/lottery-sambad-{slot}-{date_str_url}{hash_suffix}.pdf"
+        # 2. Backup: lotterysambad.com old results download script
+        backup_url = f"https://www.lotterysambad.com/lotteryoldresultsdown.php?filename={pfx}{date_str_short}.PDF"
+
+        ocr_prizes = process_lottery_image(primary_url)
+        used_url = primary_url
+        if not ocr_prizes:
+            print(f"Primary URL failed for {draw['time']}. Attempting Backup URL: {backup_url}")
+            ocr_prizes = process_lottery_image(backup_url)
+            used_url = backup_url
+
         if ocr_prizes:
             data = {
                 "Date": date_str_sheets,
@@ -254,13 +284,13 @@ def main():
                 "Draw No": ocr_prizes.get("Draw No", "Live"),
                 "Lottery Name": ocr_prizes.get("Lottery Name", draw["name"])
             }
-            # Merge the OCR extracted prizes into our payload
+            # Merge the extracted prizes into our payload
             data.update(ocr_prizes)
             # Add Source URL at the end so it appears as the last column in the sheet
-            data["source_url"] = url
+            data["source_url"] = used_url
             send_to_gas(f"Results {draw['time']}", data)
         else:
-            print(f"Skipping {draw['time']}: PDF not available yet or extraction failed.")
+            print(f"Skipping {draw['time']}: Both Primary and Backup PDFs not available yet.")
 
 if __name__ == "__main__":
     main()
