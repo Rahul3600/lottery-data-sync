@@ -148,39 +148,68 @@ def build_vip(top300):
 
 
 # ── Trust Badge Calculation ───────────────────────────────────────────────────
-def calculate_trust_badge(yesterday_pred_str, yesterday_results_dict):
-    clean_pred_str = yesterday_pred_str.replace('"', '').replace(' ', '')
+def calculate_trust_badge(pred_str, results_dict):
+    clean_pred_str = pred_str.replace('"', '').replace(' ', '')
     if not clean_pred_str:
         return ""
     
-    predicted_4_digits = set([p[-4:] for p in clean_pred_str.split(",") if len(p) >= 4])
+    tokens = [p.strip() for p in clean_pred_str.split(",") if p.strip()]
+    pred_6_digits = set()
+    for t in tokens:
+        m = re.findall(r'\b\d{6}\b', t)
+        if m:
+            pred_6_digits.add(m[0])
+            
+    pred_4_digits = set([p for p in tokens if len(p) == 4 and p.isdigit()])
+    pred_last4 = pred_4_digits.union(set([p[-4:] for p in pred_6_digits]))
     
-    prize_keys = [
+    matched_details = []
+    
+    # 1. 6-digit prizes (1st, Cons, 2nd, 3rd)
+    six_digit_prizes = [
         ("1st Prize", ["first_prize", "1st Prize"]),
+        ("Cons Prize", ["consolidate_prize", "Consolidate Prize"]),
         ("2nd Prize", ["second_prize", "2nd Prize"]),
-        ("3rd Prize", ["third_prize", "3rd Prize"]),
+        ("3rd Prize", ["third_prize", "3rd Prize"])
+    ]
+    for label, keys in six_digit_prizes:
+        prize_val = ""
+        for k in keys:
+            val = str(results_dict.get(k, "") or "")
+            if val and val != "None":
+                prize_val = val
+                break
+        if prize_val:
+            nums_6 = re.findall(r'\b\d{6}\b', prize_val)
+            exact_matches = [n for n in nums_6 if n in pred_6_digits]
+            last4_matches = [n[-4:] for n in nums_6 if n not in pred_6_digits and n[-4:] in pred_last4]
+            matches = []
+            for n in sorted(exact_matches):
+                matches.append(f"{n} (Exact)")
+            for n in sorted(set(last4_matches)):
+                matches.append(f"{n}")
+            if matches:
+                matched_details.append(f"{label}: " + ", ".join(matches))
+                
+    # 2. 4-digit prizes (4th to 9th)
+    four_digit_prizes = [
         ("4th Prize", ["fourth_prize", "4th Prize"]),
         ("5th Prize", ["fifth_prize", "5th Prize"]),
         ("6th Prize", ["sixth_prize", "6th_prize", "6th Prize"]),
         ("7th Prize", ["seventh_prize", "7th_prize", "7th Prize"]),
         ("8th Prize", ["eighth_prize", "8th_prize", "8th Prize"]),
-        ("9th Prize", ["ninth_prize", "9th_prize", "9th Prize"]),
-        ("Cons Prize", ["consolidate_prize", "Consolidate Prize"])
+        ("9th Prize", ["ninth_prize", "9th_prize", "9th Prize"])
     ]
-    
-    matched_details = []
-    
-    for label, keys in prize_keys:
+    for label, keys in four_digit_prizes:
         prize_val = ""
         for k in keys:
-            val = str(yesterday_results_dict.get(k, ""))
-            if val:
+            val = str(results_dict.get(k, "") or "")
+            if val and val != "None":
                 prize_val = val
                 break
-        
         if prize_val:
             winning_numbers = set([n[-4:] for n in re.findall(r'\d{4,}', prize_val) if len(n) >= 4])
-            matched = predicted_4_digits.intersection(winning_numbers)
+            matched = pred_last4.intersection(winning_numbers)
             if matched:
                 matched_sorted = sorted(list(matched), key=lambda x: int(x) if x.isdigit() else x)
                 matched_details.append(f"{label}: " + ", ".join(matched_sorted))
@@ -290,7 +319,7 @@ def main():
         print(f"  [Trust] Same-day result matched for today ({today_str}): {'MATCHED' if today_trust_matched else 'NO MATCH'}")
     elif today_pred_row:
         # Preserve existing trust badge if already present
-        today_trust_matched = str(today_pred_row.get("Trust Matched Numbers", "") or today_pred_row.get("trust_matched_numbers", ""))
+        today_trust_matched = str(today_pred_row.get("Trust Matched Numbers", "") or today_pred_row.get("trust_matched_numbers", "") or today_pred_row.get("trust-matched_numbers", "") or "")
 
     data = {
         "Date":                     date_str,
