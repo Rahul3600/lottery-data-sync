@@ -337,20 +337,19 @@ def main():
         rows, preds = fetch_gas_data(draw["time"], pred_tab)
         print(f"  Rows fetched: {len(rows)} | Preds fetched: {len(preds)}")
 
-        # Trust Badge Logic
+        # 1. Update Yesterday's Trust Badge (if yesterday result & pred exist)
         yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
-        yesterday_pred_row = next((r for r in preds if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
+        yesterday_pred_row   = next((r for r in preds if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
         yesterday_result_row = next((r for r in rows if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
-        
-        trust_matched = ""
+
         if yesterday_pred_row and yesterday_result_row:
-            pred_4_str = str(yesterday_pred_row.get("4 Digit Prediction", "") or yesterday_pred_row.get("4_digit_prediction", ""))
-            pred_5_str = str(yesterday_pred_row.get("5 Digit Prediction", "") or yesterday_pred_row.get("5_digit_prediction", ""))
-            super_vip_str = str(yesterday_pred_row.get("SUPER VIP PREDICTION", "") or yesterday_pred_row.get("super_vip_prediction", ""))
-            
-            all_preds = f"{pred_4_str},{pred_5_str},{super_vip_str}"
-            trust_matched = calculate_trust_badge(all_preds, yesterday_result_row)
-            print(f"  Trust Badge evaluated for yesterday")
+            p4 = str(yesterday_pred_row.get("4 Digit Prediction", "") or yesterday_pred_row.get("4_digit_prediction", ""))
+            p5 = str(yesterday_pred_row.get("5 Digit Prediction", "") or yesterday_pred_row.get("5_digit_prediction", ""))
+            pvip = str(yesterday_pred_row.get("SUPER VIP PREDICTION", "") or yesterday_pred_row.get("super_vip_prediction", ""))
+            y_matched = calculate_trust_badge(f"{p4},{p5},{pvip}", yesterday_result_row)
+            if y_matched:
+                send_update_trust_to_gas(pred_tab, yesterday_str, y_matched)
+                print(f"  [Trust] Updated yesterday's ({yesterday_str}) trust badge: {y_matched[:60]}")
 
         fifth_scored, first_leading_map, most_recent = parse_historical(rows, today, weekday_int)
         print(f"  5th-prize data points: {len(fifth_scored)}")
@@ -372,6 +371,27 @@ def main():
         print(f"  5-Digit count : {len(five_pred)}")
         print(f"  SUPER VIP     : {super_vip}")
 
+        # 2. Check if Today's Result is already available (Same-day manual trigger)
+        today_str = date_str
+        today_result_row = next((r for r in rows if r.get("Date", "")[:10] == today_str or r.get("date", "")[:10] == today_str), None)
+        today_pred_row   = next((r for r in preds if r.get("Date", "")[:10] == today_str or r.get("date", "")[:10] == today_str), None)
+
+        today_trust_matched = ""
+        if today_result_row:
+            # Result is out today! Compare against today's predictions
+            if today_pred_row:
+                p4 = str(today_pred_row.get("4 Digit Prediction", "") or today_pred_row.get("4_digit_prediction", ""))
+                p5 = str(today_pred_row.get("5 Digit Prediction", "") or today_pred_row.get("5_digit_prediction", ""))
+                pvip = str(today_pred_row.get("SUPER VIP PREDICTION", "") or today_pred_row.get("super_vip_prediction", ""))
+                today_trust_matched = calculate_trust_badge(f"{p4},{p5},{pvip}", today_result_row)
+            else:
+                all_today = f"{fmt(four_pred)},{fmt(five_pred)},{fmt(super_vip)}"
+                today_trust_matched = calculate_trust_badge(all_today, today_result_row)
+            print(f"  [Trust] Same-day result matched for today ({today_str}): {'MATCHED' if today_trust_matched else 'NO MATCH'}")
+        elif today_pred_row:
+            # Preserve existing trust badge if already present
+            today_trust_matched = str(today_pred_row.get("Trust Matched Numbers", "") or today_pred_row.get("trust_matched_numbers", ""))
+
         data = {
             "Date":                  date_str,
             "Time":                  f"'{draw['time']}",
@@ -379,14 +399,10 @@ def main():
             "5 Digit Prediction":    fmt(five_pred),
             "4 Digit Prediction":    fmt(four_pred),
             "SUPER VIP PREDICTION":  fmt(super_vip),
-            "Trust Matched Numbers": "" 
+            "Trust Matched Numbers": today_trust_matched 
         }
 
-        # 1. Update Yesterday's Trust Badge (if found)
-        if yesterday_pred_row and yesterday_result_row:
-            send_update_trust_to_gas(pred_tab, yesterday_str, trust_matched)
-            
-        # 2. Insert Today's Prediction
+        # 3. Insert or update Today's Prediction with Trust Matched Numbers included
         send_to_gas(pred_tab, data)
         print(f"  [DONE] -> '{pred_tab}'")
 
