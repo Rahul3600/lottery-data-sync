@@ -242,19 +242,18 @@ def main():
     rows, preds = fetch_gas_data()
     print(f"  Rows fetched: {len(rows)} | Preds fetched: {len(preds)}")
 
-    # Trust Badge Logic
+    # 1. Update Yesterday's Trust Badge (if yesterday result & pred exist)
     yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
-    yesterday_pred_row = next((r for r in preds if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
+    yesterday_pred_row   = next((r for r in preds if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
     yesterday_result_row = next((r for r in rows if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
-    
-    trust_matched = ""
+
     if yesterday_pred_row and yesterday_result_row:
-        pred_4_str = str(yesterday_pred_row.get("4-Digit Endings (Top 300)", "") or yesterday_pred_row.get("4-digit_endings_(top_300)", "") or yesterday_pred_row.get("4_digit_endings_top_300", "") or yesterday_pred_row.get("4-Digit Endings", ""))
-        vip_6_str = str(yesterday_pred_row.get("6-Digit VIP Numbers", "") or yesterday_pred_row.get("6-digit_vip_numbers", "") or yesterday_pred_row.get("6_digit_vip_numbers", ""))
-        
-        all_preds = f"{pred_4_str},{vip_6_str}"
-        trust_matched = calculate_trust_badge(all_preds, yesterday_result_row)
-        print(f"  Trust Badge evaluated for yesterday")
+        p4 = str(yesterday_pred_row.get("4-Digit Endings (Top 300)", "") or yesterday_pred_row.get("4-digit_endings_(top_300)", "") or yesterday_pred_row.get("4_digit_endings_top_300", "") or yesterday_pred_row.get("4-Digit Endings", ""))
+        pvip = str(yesterday_pred_row.get("6-Digit VIP Numbers", "") or yesterday_pred_row.get("6-digit_vip_numbers", "") or yesterday_pred_row.get("6_digit_vip_numbers", ""))
+        y_matched = calculate_trust_badge(f"{p4},{pvip}", yesterday_result_row)
+        if y_matched:
+            send_update_trust_to_gas(PRED_TAB, yesterday_str, y_matched)
+            print(f"  [Trust] Updated yesterday's ({yesterday_str}) trust badge: {y_matched[:60]}")
 
     scores, most_recent = parse_scored_endings(rows, today, weekday_int)
     print(f"  Unique endings scored: {len(scores)}")
@@ -273,20 +272,36 @@ def main():
     print(f"  Top 300 endings : {len(top300)} generated")
     print(f"  VIP sample     : {vip[:6]}")
 
+    # 2. Check if Today's Result is already available (Same-day manual trigger)
+    today_str = date_str
+    today_result_row = next((r for r in rows if r.get("Date", "")[:10] == today_str or r.get("date", "")[:10] == today_str), None)
+    today_pred_row   = next((r for r in preds if r.get("Date", "")[:10] == today_str or r.get("date", "")[:10] == today_str), None)
+
+    today_trust_matched = ""
+    if today_result_row:
+        # Result is out today! Compare against today's predictions
+        if today_pred_row:
+            p4 = str(today_pred_row.get("4-Digit Endings (Top 300)", "") or today_pred_row.get("4-digit_endings_(top_300)", "") or today_pred_row.get("4_digit_endings_top_300", "") or today_pred_row.get("4-Digit Endings", ""))
+            pvip = str(today_pred_row.get("6-Digit VIP Numbers", "") or today_pred_row.get("6-digit_vip_numbers", "") or today_pred_row.get("6_digit_vip_numbers", ""))
+            today_trust_matched = calculate_trust_badge(f"{p4},{pvip}", today_result_row)
+        else:
+            all_today = f"{', '.join(top300)},{', '.join(vip)}"
+            today_trust_matched = calculate_trust_badge(all_today, today_result_row)
+        print(f"  [Trust] Same-day result matched for today ({today_str}): {'MATCHED' if today_trust_matched else 'NO MATCH'}")
+    elif today_pred_row:
+        # Preserve existing trust badge if already present
+        today_trust_matched = str(today_pred_row.get("Trust Matched Numbers", "") or today_pred_row.get("trust_matched_numbers", ""))
+
     data = {
         "Date":                     date_str,
         "Time":                     "'3:00 PM",   # quote prefix prevents GAS time conversion
         "Day":                      day_str,
         "4-Digit Endings (Top 300)": ", ".join(top300),
         "6-Digit VIP Numbers":      ", ".join(vip),
-        "Trust Matched Numbers":    ""  # Ensures column is auto-created by GAS
+        "Trust Matched Numbers":    today_trust_matched
     }
 
-    # 1. Update Yesterday's Trust Badge (if found)
-    if yesterday_pred_row and yesterday_result_row:
-        send_update_trust_to_gas(PRED_TAB, yesterday_str, trust_matched)
-        
-    # 2. Insert Today's Prediction
+    # 3. Insert or update Today's Prediction with Trust Matched Numbers included
     send_to_gas(data)
     print(f"  [DONE]   '{PRED_TAB}'")
 
