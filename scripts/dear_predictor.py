@@ -127,34 +127,72 @@ def parse_historical(rows, today, weekday_int):
 
 
 # ── Trust Badge Calculation ───────────────────────────────────────────────────
-def calculate_trust_badge(yesterday_pred_str, yesterday_results_dict):
-    clean_pred_str = yesterday_pred_str.replace('"', '').replace(' ', '')
+def calculate_trust_badge(pred_str, results_dict):
+    clean_pred_str = pred_str.replace('"', '').replace(' ', '')
     if not clean_pred_str:
         return ""
     
-    predicted_4_digits = set([p[-4:] for p in clean_pred_str.split(",") if len(p) >= 4])
+    tokens = [p.strip() for p in clean_pred_str.split(",") if p.strip()]
+    pred_5_digits = set([p for p in tokens if len(p) == 5 and p.isdigit()])
+    pred_4_digits = set([p for p in tokens if len(p) == 4 and p.isdigit()])
+    pred_last4 = pred_4_digits.union(set([p[-4:] for p in pred_5_digits]))
     
-    prize_keys = [
-        ("1st Prize", ["first_prize", "1st Prize"]),
-        ("2nd Prize", ["second_prize", "2nd Prize"]),
+    matched_details = []
+    
+    # 1. 1st Prize: e.g. "38D 06431"
+    prize_1st_raw = ""
+    for k in ["first_prize", "1st Prize"]:
+        val = str(results_dict.get(k, "") or "")
+        if val and val != "None":
+            prize_1st_raw = val
+            break
+            
+    if prize_1st_raw:
+        nums_5 = [n[-5:] for n in re.findall(r'\d{5,}', prize_1st_raw)]
+        if nums_5:
+            win_5 = nums_5[0]
+            win_4 = win_5[-4:]
+            if win_5 in pred_5_digits:
+                matched_details.append(f"1st Prize: {win_5} (Exact)")
+            elif win_4 in pred_last4:
+                matched_details.append(f"1st Prize: {win_4}")
+                
+    # 2. 2nd Prize: 10 numbers of 5 digits
+    prize_2nd_raw = ""
+    for k in ["second_prize", "2nd Prize"]:
+        val = str(results_dict.get(k, "") or "")
+        if val and val != "None":
+            prize_2nd_raw = val
+            break
+            
+    if prize_2nd_raw:
+        nums_5 = [n[-5:] for n in re.findall(r'\d{5,}', prize_2nd_raw)]
+        exact_matches = [n for n in nums_5 if n in pred_5_digits]
+        last4_matches = [n[-4:] for n in nums_5 if n not in pred_5_digits and n[-4:] in pred_last4]
+        matches_2nd = []
+        for n in sorted(exact_matches):
+            matches_2nd.append(f"{n} (Exact)")
+        for n in sorted(set(last4_matches)):
+            matches_2nd.append(f"{n}")
+        if matches_2nd:
+            matched_details.append("2nd Prize: " + ", ".join(matches_2nd))
+            
+    # 3. 3rd, 4th, 5th Prizes (4-digit winning numbers)
+    four_digit_prizes = [
         ("3rd Prize", ["third_prize", "3rd Prize"]),
         ("4th Prize", ["fourth_prize", "4th Prize"]),
         ("5th Prize", ["fifth_prize", "5th Prize"])
     ]
-    
-    matched_details = []
-    
-    for label, keys in prize_keys:
+    for label, keys in four_digit_prizes:
         prize_val = ""
         for k in keys:
-            val = str(yesterday_results_dict.get(k, ""))
-            if val:
+            val = str(results_dict.get(k, "") or "")
+            if val and val != "None":
                 prize_val = val
                 break
-        
         if prize_val:
             winning_numbers = set([n[-4:] for n in re.findall(r'\d{4,}', prize_val) if len(n) >= 4])
-            matched = predicted_4_digits.intersection(winning_numbers)
+            matched = pred_last4.intersection(winning_numbers)
             if matched:
                 matched_sorted = sorted(list(matched), key=lambda x: int(x) if x.isdigit() else x)
                 matched_details.append(f"{label}: " + ", ".join(matched_sorted))
@@ -343,9 +381,9 @@ def main():
         yesterday_result_row = next((r for r in rows if r.get("Date", "")[:10] == yesterday_str or r.get("date", "")[:10] == yesterday_str), None)
 
         if yesterday_pred_row and yesterday_result_row:
-            p4 = str(yesterday_pred_row.get("4 Digit Prediction", "") or yesterday_pred_row.get("4_digit_prediction", ""))
-            p5 = str(yesterday_pred_row.get("5 Digit Prediction", "") or yesterday_pred_row.get("5_digit_prediction", ""))
-            pvip = str(yesterday_pred_row.get("SUPER VIP PREDICTION", "") or yesterday_pred_row.get("super_vip_prediction", ""))
+            p4 = str(yesterday_pred_row.get("4 Digit Prediction", "") or yesterday_pred_row.get("4_digit_prediction", "") or yesterday_pred_row.get("4-digit_prediction", "") or "")
+            p5 = str(yesterday_pred_row.get("5 Digit Prediction", "") or yesterday_pred_row.get("5_digit_prediction", "") or yesterday_pred_row.get("5-digit_prediction", "") or "")
+            pvip = str(yesterday_pred_row.get("SUPER VIP PREDICTION", "") or yesterday_pred_row.get("super_vip_prediction", "") or yesterday_pred_row.get("super-vip-prediction", "") or "")
             y_matched = calculate_trust_badge(f"{p4},{p5},{pvip}", yesterday_result_row)
             if y_matched:
                 send_update_trust_to_gas(pred_tab, yesterday_str, y_matched)
@@ -380,9 +418,9 @@ def main():
         if today_result_row:
             # Result is out today! Compare against today's predictions
             if today_pred_row:
-                p4 = str(today_pred_row.get("4 Digit Prediction", "") or today_pred_row.get("4_digit_prediction", ""))
-                p5 = str(today_pred_row.get("5 Digit Prediction", "") or today_pred_row.get("5_digit_prediction", ""))
-                pvip = str(today_pred_row.get("SUPER VIP PREDICTION", "") or today_pred_row.get("super_vip_prediction", ""))
+                p4 = str(today_pred_row.get("4 Digit Prediction", "") or today_pred_row.get("4_digit_prediction", "") or today_pred_row.get("4-digit_prediction", "") or "")
+                p5 = str(today_pred_row.get("5 Digit Prediction", "") or today_pred_row.get("5_digit_prediction", "") or today_pred_row.get("5-digit_prediction", "") or "")
+                pvip = str(today_pred_row.get("SUPER VIP PREDICTION", "") or today_pred_row.get("super_vip_prediction", "") or today_pred_row.get("super-vip-prediction", "") or "")
                 today_trust_matched = calculate_trust_badge(f"{p4},{p5},{pvip}", today_result_row)
             else:
                 all_today = f"{fmt(four_pred)},{fmt(five_pred)},{fmt(super_vip)}"
@@ -390,7 +428,7 @@ def main():
             print(f"  [Trust] Same-day result matched for today ({today_str}): {'MATCHED' if today_trust_matched else 'NO MATCH'}")
         elif today_pred_row:
             # Preserve existing trust badge if already present
-            today_trust_matched = str(today_pred_row.get("Trust Matched Numbers", "") or today_pred_row.get("trust_matched_numbers", ""))
+            today_trust_matched = str(today_pred_row.get("Trust Matched Numbers", "") or today_pred_row.get("trust_matched_numbers", "") or today_pred_row.get("trust-matched_numbers", "") or "")
 
         data = {
             "Date":                  date_str,
